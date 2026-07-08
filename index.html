@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="theme-color" content="#f7f3ee" id="theme-color-meta"/>
+<title>DAYBOOK</title>
+<link rel="manifest" href="manifest.json"/>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600&family=Nunito:wght@400;600;700&family=Caveat:wght@400;600&family=Patrick+Hand&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#f7f3ee;--panel:#fffdf9;--ink:#201810;--muted:#8b7d6b;--line:#e6dccb;--accent:#a85c32;--accent-soft:rgba(168,92,50,.12);--fs:16px}
+html{font-size:var(--fs)}
+body{font-family:'EB Garamond',serif;background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s}
+input,textarea,select{font-family:inherit;font-size:1rem;color:var(--ink);background:transparent}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.55;font-style:italic}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation;color:var(--ink)}
+a{color:var(--ink)}img{display:block;max-width:100%}select{cursor:pointer}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");opacity:.35}
+
+/* AUTH */
+#auth-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden}
+#auth-screen::before,#auth-screen::after{content:'';position:absolute;left:0;right:0;height:3px;background:repeating-linear-gradient(90deg,var(--ink) 0,var(--ink) 26px,transparent 26px,transparent 52px)}
+#auth-screen::before{top:0}#auth-screen::after{bottom:0}
+.auth-box{max-width:380px;width:100%;text-align:center;position:relative;z-index:1}
+.masthead-sub{font-size:.6rem;letter-spacing:.5em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.masthead-title{font-size:4.2rem;font-weight:700;line-height:.9;letter-spacing:-.02em}
+.masthead-rule{width:48px;height:1px;background:var(--accent);margin:22px auto 12px}
+.masthead-tagline{font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:44px}
+#g_signin_btn{display:flex;justify-content:center;min-height:44px}
+.auth-note{font-size:.8rem;color:var(--muted);margin-top:18px;font-style:italic;line-height:1.6}
+.auth-local{background:none;border:none;color:var(--muted);text-decoration:underline;font-size:.8rem;margin-top:26px;font-style:italic}
+
+/* SHELL */
+#app{display:none;min-height:100vh;flex-direction:column}
+#app.visible{display:flex}
+header{position:sticky;top:0;z-index:200;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.header-stripe{height:3px;background:repeating-linear-gradient(90deg,var(--ink) 0,var(--ink) 22px,transparent 22px,transparent 44px)}
+.header-inner{max-width:720px;margin:0 auto;padding:10px 20px 8px;display:flex;align-items:baseline;justify-content:space-between}
+.brand-name{font-size:1.45rem;font-weight:700;letter-spacing:.06em}
+.brand-sub{font-size:.55rem;letter-spacing:.4em;text-transform:uppercase;color:var(--muted)}
+main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px + env(safe-area-inset-bottom))}
+
+/* BOTTOM NAV */
+#bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:300;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(16px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 6px calc(10px + env(safe-area-inset-bottom))}
+.nav-btn{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;padding:4px 10px;transition:color .2s}
+.nav-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.nav-btn.active{color:var(--accent)}
+
+/* SECTION HEAD */
+.section-rule{border-top:3px solid var(--ink);padding-top:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px}
+.section-title{font-size:1.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.section-sub{font-size:.82rem;color:var(--muted);font-style:italic;margin-top:2px}
+
+/* EDITOR */
+.day-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.day-step{background:var(--panel);border:1px solid var(--line);width:40px;height:40px;font-size:1.25rem;color:var(--muted);border-radius:50%;flex-shrink:0;transition:color .2s}
+.day-step:not(:disabled):hover{color:var(--ink)}
+.day-step:disabled{opacity:.3;cursor:default}
+.day-title{text-align:center;flex:1;min-width:0}
+.day-dow{font-size:.62rem;letter-spacing:.35em;text-transform:uppercase;color:var(--accent)}
+.day-date{font-size:1.5rem;font-weight:700;line-height:1.15}
+.today-jump{display:block;margin:2px auto 0;background:none;border:none;color:var(--muted);font-size:.75rem;font-style:italic;text-decoration:underline}
+.tpl-row{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 20px}
+.tpl-row label{font-size:.6rem;letter-spacing:.25em;text-transform:uppercase;color:var(--muted)}
+.tpl-row select{border:1px solid var(--line);background:var(--panel);padding:5px 8px;font-size:.85rem;border-radius:3px;max-width:220px}
+.field{margin-bottom:22px}
+.field-label{font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:600}
+.vfield{display:flex;gap:8px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:10px 10px 10px 12px;transition:border-color .2s}
+.vfield:focus-within{border-color:var(--accent)}
+.vfield input,.vfield textarea{flex:1;border:none;outline:none;resize:none;line-height:1.55;min-width:0}
+.vfield textarea{min-height:24px;overflow:hidden}
+.vfield.tall textarea{min-height:120px}
+.list-num{font-size:.85rem;color:var(--accent);font-weight:600;padding-top:2px;width:16px;flex-shrink:0;font-style:italic}
+.vfield+.vfield{margin-top:8px}
+.mic{background:none;border:none;padding:0 2px;color:var(--muted);flex-shrink:0;transition:color .2s;line-height:0}
+.mic svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.mic.rec{color:var(--accent);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.15)}}
+.mood-row{display:flex;gap:6px}
+.mood-opt{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .2s}
+.mood-opt .m-emoji{font-size:1.3rem;filter:grayscale(1);opacity:.55;transition:all .2s}
+.mood-opt .m-label{font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.mood-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.mood-opt.on .m-emoji{filter:none;opacity:1;transform:scale(1.12)}
+.mood-opt.on .m-label{color:var(--accent);font-weight:600}
+.photo-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:10px}
+.photo-thumb{aspect-ratio:1;overflow:hidden;border:1px solid var(--line);border-radius:4px;cursor:pointer;background:var(--panel)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-add-row{display:flex;gap:8px;margin-top:10px}
+.editor-foot{display:flex;justify-content:space-between;align-items:center;margin:6px 0 18px;font-size:.75rem;color:var(--muted);font-style:italic}
+.entry-actions{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:16px}
+#file-cam,#file-lib,#import-file{display:none}
+
+/* BUTTONS */
+.btn{background:var(--panel);border:1px solid var(--line);padding:9px 16px;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);border-radius:3px;display:inline-flex;align-items:center;gap:7px;transition:all .2s}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.danger{color:var(--accent);border-color:var(--accent-soft)}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.btn.small{padding:6px 11px;font-size:.6rem}
+
+/* TIMELINE */
+.search-wrap{margin-bottom:18px}
+.search-wrap input{width:100%;border:1px solid var(--line);background:var(--panel);padding:10px 14px;border-radius:4px;outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.entry-card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;margin-bottom:14px;cursor:pointer;transition:box-shadow .2s,border-color .2s}
+.entry-card:hover{border-color:var(--accent);box-shadow:0 3px 16px rgba(0,0,0,.06)}
+.ec-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.ec-date{font-weight:700;font-size:1.05rem}
+.ec-meta{font-size:.72rem;color:var(--muted);font-style:italic;white-space:nowrap}
+.ec-snippet{font-size:.92rem;line-height:1.55;color:var(--ink);opacity:.85;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ec-photos{display:flex;gap:6px;margin-top:10px}
+.ec-photos img{width:52px;height:52px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+.empty-note{text-align:center;color:var(--muted);font-style:italic;padding:48px 20px;line-height:1.7}
+
+/* CALENDAR */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-title{font-size:1.3rem;font-weight:700}
+.cal-stats{display:flex;gap:18px;margin-bottom:16px;font-size:.78rem;color:var(--muted);font-style:italic}
+.cal-stats b{color:var(--accent);font-style:normal}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:20px}
+.cal-dow{text-align:center;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);padding:4px 0}
+.cal-cell{aspect-ratio:1;border:1px solid transparent;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.85rem;color:var(--muted);background:none;position:relative}
+.cal-cell.in-month{color:var(--ink);background:var(--panel);border-color:var(--line);cursor:pointer}
+.cal-cell.today{border-color:var(--accent);font-weight:700}
+.cal-cell .dot{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.cal-cell .m-mini{font-size:.7rem;line-height:1;position:absolute;top:3px;right:3px}
+.export-block{border-top:1px solid var(--line);padding-top:16px}
+.export-label{font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-weight:600}
+.export-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* SETTINGS */
+.set-block{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;margin-bottom:16px}
+.set-label{font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;font-weight:600}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
+.theme-swatch{border:2px solid var(--line);border-radius:5px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;background:none;transition:border-color .2s}
+.theme-swatch.on{border-color:var(--accent)}
+.ts-dots{display:flex;gap:3px}
+.ts-dots span{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.1)}
+.ts-name{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.custom-colors{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap}
+.cc-item{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.cc-item input[type=color]{width:44px;height:44px;border:1px solid var(--line);border-radius:6px;padding:2px;background:var(--panel);cursor:pointer}
+.font-list{display:flex;flex-direction:column;gap:6px}
+.font-opt{border:1px solid var(--line);background:none;border-radius:4px;padding:10px 14px;text-align:left;font-size:1.05rem;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s}
+.font-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.font-opt small{font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-family:'EB Garamond',serif}
+.size-row{display:flex;gap:8px}
+.size-opt{flex:1;border:1px solid var(--line);background:none;border-radius:4px;padding:8px 4px;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.size-opt.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.tpl-list-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.tpl-list-item:last-child{border-bottom:none}
+.tli-name{font-size:.98rem}
+.tli-tag{font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:2px 6px;margin-left:8px;vertical-align:2px}
+.tli-actions{display:flex;gap:6px;flex-shrink:0}
+.icon-btn{background:none;border:1px solid var(--line);border-radius:3px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);transition:all .2s}
+.icon-btn:hover{color:var(--ink);border-color:var(--ink)}
+.icon-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sync-status{font-size:.82rem;font-style:italic;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.sync-status .ok{color:#2a5f3f}.sync-status .err{color:#a82020}
+.set-row{display:flex;gap:8px;flex-wrap:wrap}
+.signed-in-as{font-size:.9rem;margin-bottom:12px;line-height:1.5}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(20,14,8,.5);backdrop-filter:blur(6px);z-index:500;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal-box{background:var(--bg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:26px 24px;border-top:3px solid var(--ink);border-radius:0 0 6px 6px;animation:modalIn .2s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.modal-title{font-size:1.15rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.5rem;line-height:1;padding:0 0 0 14px}
+.photo-full img{width:100%;border-radius:4px;margin-bottom:14px}
+
+/* TEMPLATE BUILDER */
+.tb-name input{width:100%;border:1px solid var(--line);background:var(--panel);padding:10px 12px;border-radius:4px;outline:none;font-size:1rem;margin-bottom:16px}
+.tb-field{border:1px solid var(--line);background:var(--panel);border-radius:4px;padding:12px;margin-bottom:10px}
+.tb-field-top{display:flex;gap:8px;margin-bottom:8px}
+.tb-field-top input{flex:1;border:none;border-bottom:1px solid var(--line);outline:none;padding:2px 0;min-width:0}
+.tb-field-bottom{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tb-field-bottom select{border:1px solid var(--line);background:var(--bg);padding:4px 6px;font-size:.78rem;border-radius:3px}
+.tb-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+@media print{#bottom-nav,header,body::after{display:none!important}}
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="masthead-sub">A quiet page for every day</div>
+    <div class="masthead-title" style="font-family:'Cormorant Garamond',serif">DAYBOOK</div>
+    <div class="masthead-rule"></div>
+    <div class="masthead-tagline">Your daily journal</div>
+    <div id="g_signin_btn"></div>
+    <div class="auth-note">Sign in with Google to sync your journal automatically<br/>across every device you use.</div>
+    <button class="auth-local" onclick="localSignIn()">or use on this device only (no sync)</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="header-stripe"></div>
+    <div class="header-inner">
+      <span class="brand-name" style="font-family:'Cormorant Garamond',serif">DAYBOOK</span>
+      <span class="brand-sub" id="header-date"></span>
+    </div>
+  </header>
+  <main id="view"></main>
+  <nav id="bottom-nav">
+    <button class="nav-btn" data-v="today" onclick="showView('today')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Today</button>
+    <button class="nav-btn" data-v="entries" onclick="showView('entries')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20v-2.5"/></svg>Entries</button>
+    <button class="nav-btn" data-v="calendar" onclick="showView('calendar')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Month</button>
+    <button class="nav-btn" data-v="settings" onclick="showView('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Style</button>
+  </nav>
+  <input type="file" id="file-cam" accept="image/*" capture="environment"/>
+  <input type="file" id="file-lib" accept="image/*" multiple/>
+  <input type="file" id="import-file" accept="application/json"/>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+// ── CONSTANTS ──
+const CLIENT_ID='643043876163-9evtski9p2oqs4s1pg0nn4g1tnqdeiv8.apps.googleusercontent.com';
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const DRIVE_FILENAME='journal_data.json';
+const MOODS=[{v:1,e:'😞',l:'Rough'},{v:2,e:'😕',l:'Meh'},{v:3,e:'🙂',l:'Okay'},{v:4,e:'😊',l:'Good'},{v:5,e:'🤩',l:'Lovely'}];
+const FONTS=[
+  {n:'EB Garamond',css:"'EB Garamond',serif",tag:'Classic serif'},
+  {n:'Cormorant Garamond',css:"'Cormorant Garamond',serif",tag:'Elegant serif'},
+  {n:'Lora',css:"'Lora',serif",tag:'Modern serif'},
+  {n:'Playfair Display',css:"'Playfair Display',serif",tag:'Editorial'},
+  {n:'Inter',css:"'Inter',sans-serif",tag:'Clean sans'},
+  {n:'Nunito',css:"'Nunito',sans-serif",tag:'Soft & rounded'},
+  {n:'Caveat',css:"'Caveat',cursive",tag:'Handwritten'},
+  {n:'Patrick Hand',css:"'Patrick Hand',cursive",tag:'Casual hand'},
+  {n:'Space Mono',css:"'Space Mono',monospace",tag:'Typewriter'}
+];
+const THEMES=[
+  {id:'paper',name:'Paper',v:{bg:'#f7f3ee',panel:'#fffdf9',ink:'#201810',muted:'#8b7d6b',line:'#e6dccb',accent:'#a85c32'}},
+  {id:'midnight',name:'Midnight',v:{bg:'#12141c',panel:'#1b1e29',ink:'#e8e6df',muted:'#8a8fa3',line:'#2a2e3d',accent:'#d4a95a'}},
+  {id:'sage',name:'Sage',v:{bg:'#eef1ea',panel:'#f8faf5',ink:'#22301f',muted:'#74846c',line:'#d8e0d0',accent:'#4f7350'}},
+  {id:'blush',name:'Blush',v:{bg:'#f9f0ef',panel:'#fffafa',ink:'#33201f',muted:'#a07f7c',line:'#eddcda',accent:'#b95d68'}},
+  {id:'ocean',name:'Ocean',v:{bg:'#edf2f4',panel:'#f9fbfc',ink:'#16262e',muted:'#6c8593',line:'#d8e3e8',accent:'#2a6f8a'}},
+  {id:'plum',name:'Plum',v:{bg:'#f3eef5',panel:'#fbf8fc',ink:'#291b2e',muted:'#8a7492',line:'#e3d7e8',accent:'#7c4a8d'}}
+];
+const BUILTINS=[
+  {id:'tgt',name:'Three Good Things',builtin:true,fields:[
+    {id:'good',type:'list',count:3,label:'Three good things about today'},
+    {id:'notes',type:'long',label:'About today'}]},
+  {id:'checkin',name:'Daily Check-in',builtin:true,fields:[
+    {id:'mood',type:'mood',label:'How was today?'},
+    {id:'hl',type:'text',label:'Highlight of the day'},
+    {id:'grateful',type:'text',label:'Something I am grateful for'},
+    {id:'notes',type:'long',label:'More about today'}]},
+  {id:'free',name:'Free Write',builtin:true,fields:[
+    {id:'w',type:'long',label:'What is on your mind?'}]}
+];
+const MIC_SVG='<svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>';
+
+// ── STATE ──
+let currentUser=null,currentUserEmail=null,currentUserName='';
+let currentView='today',viewDate=null,curEntry=null,saveTimer=null;
+let calYear=null,calMonth=null,searchQ='';
+let driveAccessToken=null,driveFileId=null,driveSyncTimer=null,lastSyncAt=null,lastSyncError=null;
+let editingTpl=null;
+let rec=null,recEl=null,recBtn=null,recBase='';
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+// ── HELPERS ──
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function getStore(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function setStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){alert('Storage is full — try removing some photos from older entries.');}}
+function userKey(k){return `journal_${currentUser}_${k}`;}
+function userData(k,d){return getStore(userKey(k),d);}
+function saveData(k,v){setStore(userKey(k),v);scheduleDriveSync();}
+function dkey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function parseKey(k){const p=k.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
+function fmtDow(d){return d.toLocaleDateString('en-GB',{weekday:'long'});}
+function fmtLong(d){return d.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});}
+function fmtFull(d){return fmtDow(d)+' '+fmtLong(d);}
+function monthName(y,m){return new Date(y,m,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
+
+// ── DATA ──
+function getEntriesRaw(){return userData('entries',{});}
+function getEntry(k){const e=getEntriesRaw()[k];return (e&&!e.deleted)?e:null;}
+function putEntry(k,e){const all=getEntriesRaw();e.updated=Date.now();all[k]=e;saveData('entries',all);}
+function liveEntryKeys(){const all=getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
+function entryHasContent(e){if(!e)return false;if((e.photos||[]).length)return true;return Object.values(e.v||{}).some(v=>Array.isArray(v)?v.some(x=>String(x||'').trim()):String(v||'').trim());}
+function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',defaultTemplate:'tgt',custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
+function saveSettings(patch){const s=Object.assign(settingsData(),patch);s.updated=Date.now();saveData('settings',s);applyAppearance();}
+function customTemplates(){return userData('templates',[]).filter(t=>!t.deleted);}
+function getTemplates(){return BUILTINS.concat(customTemplates());}
+function templateById(id){return getTemplates().find(t=>t.id===id)||BUILTINS[0];}
+function entryMood(e){if(!e)return null;const tpl=templateById(e.t);const mf=tpl.fields.find(f=>f.type==='mood');const v=mf?e.v[mf.id]:null;return MOODS.find(m=>m.v===v)||null;}
+function entrySnippet(e){const tpl=templateById(e.t);for(const f of tpl.fields){const v=e.v[f.id];if(f.type==='mood')continue;if(Array.isArray(v)){const t=v.filter(x=>String(x||'').trim()).join(' · ');if(t)return t;}else if(String(v||'').trim())return v.trim();}return '';}
+function entryWords(e){let n=0;const tpl=templateById(e.t);tpl.fields.forEach(f=>{const v=e.v[f.id];const txt=Array.isArray(v)?v.join(' '):(typeof v==='string'?v:'');n+=txt.split(/\s+/).filter(Boolean).length;});return n;}
+
+// ── APPEARANCE ──
+function themeVars(){
+  const s=settingsData();
+  if(s.theme==='custom'){
+    const c=s.custom||{};const bg=c.bg||'#f7f3ee',ink=c.ink||'#201810',accent=c.accent||'#a85c32';
+    return {bg,ink,accent,panel:`color-mix(in srgb, ${bg} 60%, white)`,muted:`color-mix(in srgb, ${ink} 55%, ${bg})`,line:`color-mix(in srgb, ${ink} 14%, ${bg})`};
+  }
+  return (THEMES.find(t=>t.id===s.theme)||THEMES[0]).v;
+}
+function applyAppearance(){
+  const s=settingsData(),v=themeVars(),r=document.documentElement.style;
+  r.setProperty('--bg',v.bg);r.setProperty('--panel',v.panel);r.setProperty('--ink',v.ink);
+  r.setProperty('--muted',v.muted);r.setProperty('--line',v.line);r.setProperty('--accent',v.accent);
+  r.setProperty('--accent-soft',`color-mix(in srgb, ${v.accent} 12%, transparent)`);
+  const f=FONTS.find(x=>x.n===s.font)||FONTS[0];
+  document.body.style.fontFamily=f.css;
+  r.setProperty('--fs',{s:'14.5px',m:'16px',l:'17.5px',xl:'19px'}[s.size]||'16px');
+  const meta=document.getElementById('theme-color-meta');if(meta&&!String(v.bg).includes('mix'))meta.content=v.bg;
+}
+
+// ── AUTH ──
+function initGoogle(){
+  if(typeof google==='undefined'||!google.accounts)return;
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleGoogleLogin,auto_select:true});
+  google.accounts.id.renderButton(document.getElementById('g_signin_btn'),{theme:'outline',size:'large',text:'sign_in_with',shape:'rectangular',width:260});
+}
+function parseJwt(t){try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));}catch(e){return null;}}
+function handleGoogleLogin(response){
+  const p=parseJwt(response.credential);if(!p)return;
+  localStorage.setItem('journal_sess',JSON.stringify({sub:p.sub,email:p.email||null,name:p.name||p.email||'You',exp:Date.now()+30*24*60*60*1000}));
+  enterApp(p.sub,p.email||null,p.name||p.email||'You');
+  driveBoot();
+}
+function localSignIn(){
+  localStorage.setItem('journal_sess',JSON.stringify({sub:'local',email:null,name:'You',exp:Date.now()+3650*24*60*60*1000}));
+  enterApp('local',null,'You');
+}
+function enterApp(sub,email,name){
+  currentUser=sub;currentUserEmail=email;currentUserName=name;
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  applyAppearance();
+  viewDate=dkey(new Date());
+  document.getElementById('header-date').textContent=fmtLong(new Date());
+  setupFileInputs();
+  showView('today');
+}
+function signOut(){
+  if(!confirm('Sign out? Your journal stays saved on this device and in your Google Drive.'))return;
+  localStorage.removeItem('journal_sess');localStorage.removeItem('journal_drive_tok');
+  location.reload();
+}
+window.addEventListener('load',()=>{
+  checkDriveRedirect();
+  try{
+    const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
+    if(sess&&sess.exp>Date.now()&&sess.sub){
+      enterApp(sess.sub,sess.email||null,sess.name||'You');
+      if(sess.sub!=='local')driveBoot();
+      return;
+    }
+  }catch(e){}
+  if(typeof google!=='undefined'&&google.accounts)initGoogle();
+  else{const s=document.querySelector('script[src*="gsi"]');if(s)s.addEventListener('load',initGoogle);}
+});
+
+// ── DRIVE SYNC (redirect flow, per-day merge) ──
+function checkDriveRedirect(){
+  if(!location.hash)return;
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('state')!=='journal_drive')return;
+  const err=h.get('error');
+  if(err){sessionStorage.setItem('journal_drive_err',err);}
+  else if(h.get('access_token')){
+    const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
+    localStorage.setItem('journal_drive_tok',JSON.stringify({tok:h.get('access_token'),exp}));
+    sessionStorage.removeItem('journal_drive_err');sessionStorage.removeItem('journal_drive_tried');
+  }
+  history.replaceState(null,'',location.pathname+location.search);
+}
+function getDriveToken(){try{const t=JSON.parse(localStorage.getItem('journal_drive_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
+function driveAuthRedirect(interactive){
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:DRIVE_SCOPE,state:'journal_drive',include_granted_scopes:'true'});
+  if(currentUserEmail)p.set('login_hint',currentUserEmail);
+  if(!interactive)p.set('prompt','none');
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
+}
+function driveBoot(){
+  driveAccessToken=getDriveToken();
+  if(driveAccessToken){
+    localStorage.setItem(`journal_drive_on_${currentUser}`,'1');
+    driveSyncNow(false);
+    return;
+  }
+  if(localStorage.getItem(`journal_drive_on_${currentUser}`)&&!sessionStorage.getItem('journal_drive_tried')){
+    sessionStorage.setItem('journal_drive_tried','1');
+    driveAuthRedirect(false);
+  }
+}
+function driveTokenInvalid(){localStorage.removeItem('journal_drive_tok');driveAccessToken=null;}
+function enableDriveSync(){sessionStorage.removeItem('journal_drive_err');lastSyncError=null;driveAuthRedirect(true);}
+function disableDriveSync(){driveTokenInvalid();localStorage.removeItem(`journal_drive_on_${currentUser}`);if(driveSyncTimer){clearTimeout(driveSyncTimer);driveSyncTimer=null;}showView('settings');}
+async function driveFetch(url,opts){
+  const res=await fetch(url,opts);
+  if(res.status===401){driveTokenInvalid();throw new Error('Google sign-in expired — tap Reconnect sync in Style.');}
+  if(res.status===403){let msg='';try{const j=await res.json();msg=(j.error&&j.error.message)||'';}catch(e){}throw new Error(msg||'Google Drive refused the request (403).');}
+  if(!res.ok)throw new Error('Drive error '+res.status);
+  return res;
+}
+function scheduleDriveSync(){
+  if(!driveAccessToken)return;
+  if(driveSyncTimer)clearTimeout(driveSyncTimer);
+  driveSyncTimer=setTimeout(()=>{driveSyncNow(false);},2500);
+}
+async function driveSyncNow(manual){
+  if(!driveAccessToken||!currentUser||currentUser==='local')return;
+  try{
+    const verdict=await pullAndMerge();
+    if(verdict!=='insync')await pushToDrive();
+    lastSyncAt=Date.now();lastSyncError=null;
+    if(manual){alert('Synced successfully ✓');showView('settings');}
+    else if(currentView==='settings')showView('settings');
+  }catch(e){
+    lastSyncError=(e&&e.message)?e.message:String(e);
+    if(manual)alert('Sync failed: '+lastSyncError);
+  }
+}
+async function pullAndMerge(){
+  const auth={headers:{Authorization:'Bearer '+driveAccessToken}};
+  const res=await driveFetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${DRIVE_FILENAME}%27&fields=files(id)`,auth);
+  const list=await res.json();
+  const file=(list.files||[])[0];
+  if(!file){driveFileId=null;return 'nofile';}
+  driveFileId=file.id;
+  const dr=await driveFetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,auth);
+  const p=await dr.json();
+  if(!p||typeof p!=='object')return 'nofile';
+  // Merge per-entry and per-template: the newer 'updated' stamp wins for each item.
+  const lE=userData('entries',{}),rE=p.entries||{};
+  const mE={};
+  new Set(Object.keys(lE).concat(Object.keys(rE))).forEach(k=>{
+    const a=lE[k],b=rE[k];
+    mE[k]=!a?b:(!b?a:(((a.updated||0)>=(b.updated||0))?a:b));
+  });
+  const lT=userData('templates',[]),rT=p.templates||[];
+  const byId={};
+  rT.concat(lT).forEach(t=>{const cur=byId[t.id];if(!cur||(t.updated||0)>(cur.updated||0))byId[t.id]=t;});
+  const mT=Object.values(byId).sort((a,b)=>(a.created||0)-(b.created||0));
+  const lS=userData('settings',{}),rS=p.settings||{};
+  const mS=((lS.updated||0)>=(rS.updated||0))?lS:rS;
+  const mStr=JSON.stringify({e:mE,t:mT,s:mS});
+  const localChanged=mStr!==JSON.stringify({e:lE,t:lT,s:lS});
+  const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS});
+  if(localChanged){
+    setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);
+    applyAppearance();curEntry=null;showView(currentView);
+  }
+  return pushNeeded?'pushneeded':'insync';
+}
+async function pushToDrive(){
+  if(!driveAccessToken||!currentUser)return;
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),at:Date.now()});
+  if(driveFileId){
+    await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+driveAccessToken,'Content-Type':'application/json'},body});
+  }else{
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify({name:DRIVE_FILENAME,parents:['appDataFolder']})],{type:'application/json'}));
+    form.append('file',new Blob([body],{type:'application/json'}));
+    const cr=await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+driveAccessToken},body:form});
+    const created=await cr.json();
+    if(created.id)driveFileId=created.id;
+  }
+}
+
+// ── NAV ──
+function showView(v){
+  currentView=v;
+  stopMic();
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
+  const el=document.getElementById('view');
+  if(v==='today')renderToday(el);
+  else if(v==='entries')renderEntries(el);
+  else if(v==='calendar')renderCalendar(el);
+  else renderSettings(el);
+  window.scrollTo(0,0);
+}
+
+// ── EDITOR ──
+function renderToday(el){
+  const k=viewDate,d=parseKey(k),todayKey=dkey(new Date());
+  const isToday=k===todayKey,isFuture=k>todayKey;
+  const stored=getEntry(k);
+  curEntry=stored?JSON.parse(JSON.stringify(stored)):{t:settingsData().defaultTemplate,v:{},photos:[],created:Date.now()};
+  const tpl=templateById(curEntry.t);
+  let h=`<div class="day-nav">
+    <button class="day-step" onclick="stepDay(-1)">‹</button>
+    <div class="day-title"><div class="day-dow">${isToday?'Today':esc(fmtDow(d))}</div><div class="day-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtLong(d))}</div></div>
+    <button class="day-step" onclick="stepDay(1)" ${isToday||isFuture?'disabled':''}>›</button>
+  </div>`;
+  if(!isToday)h+=`<button class="today-jump" onclick="goToday()">back to today</button>`;
+  h+=`<div class="tpl-row"><label>Template</label><select onchange="switchTpl(this.value)">${getTemplates().map(t=>`<option value="${t.id}" ${t.id===curEntry.t?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>`;
+  h+=tpl.fields.map(renderField).join('');
+  h+=`<div class="field"><div class="field-label">Photos</div>
+    <div class="photo-strip" id="photo-strip">${(curEntry.photos||[]).map(p=>`<div class="photo-thumb" onclick="viewPhoto('${p.id}')"><img src="${p.img}" alt=""/></div>`).join('')}</div>
+    <div class="photo-add-row">
+      <button class="btn small" onclick="document.getElementById('file-cam').click()"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+      <button class="btn small" onclick="document.getElementById('file-lib').click()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Add photos</button>
+    </div></div>`;
+  h+=`<div class="editor-foot"><span id="save-status"></span><span id="word-count">${wordLabel()}</span></div>`;
+  h+=`<div class="entry-actions">
+    <button class="btn" onclick="shareDay('${k}')"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>Share</button>
+    <button class="btn" onclick="downloadDay('${k}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export day</button>
+    ${stored?`<button class="btn danger" onclick="deleteDay('${k}')">Delete entry</button>`:''}
+  </div>`;
+  el.innerHTML=h;
+  requestAnimationFrame(()=>el.querySelectorAll('textarea').forEach(autogrow));
+}
+function renderField(f){
+  const v=curEntry.v[f.id];
+  const mic=SR?`<button class="mic" onclick="toggleMic(this)" title="Dictate">${MIC_SVG}</button>`:'';
+  if(f.type==='mood'){
+    return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="mood-row">${MOODS.map(m=>
+      `<button class="mood-opt ${v===m.v?'on':''}" onclick="setMood('${f.id}',${m.v})"><span class="m-emoji">${m.e}</span><span class="m-label">${m.l}</span></button>`).join('')}</div></div>`;
+  }
+  if(f.type==='list'){
+    const arr=Array.isArray(v)?v:[];
+    let rows='';
+    for(let i=0;i<(f.count||3);i++){
+      rows+=`<div class="vfield"><span class="list-num">${i+1}.</span><input data-f="${f.id}" data-i="${i}" value="${esc(arr[i]||'')}" oninput="onField(this)"/>${mic}</div>`;
+    }
+    return `<div class="field"><div class="field-label">${esc(f.label)}</div>${rows}</div>`;
+  }
+  if(f.type==='text'){
+    return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="vfield"><input data-f="${f.id}" value="${esc(v||'')}" oninput="onField(this)"/>${mic}</div></div>`;
+  }
+  return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="vfield tall"><textarea data-f="${f.id}" oninput="onField(this)" placeholder="Write, or tap the mic and speak…">${esc(v||'')}</textarea>${mic}</div></div>`;
+}
+function wordLabel(){const n=curEntry?entryWords(curEntry):0;return n?`${n} word${n===1?'':'s'}`:'';}
+function autogrow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';}
+function onField(el){
+  const f=el.dataset.f,i=el.dataset.i;
+  if(i!==undefined&&i!==null&&i!==''){
+    const arr=Array.isArray(curEntry.v[f])?curEntry.v[f].slice():[];
+    arr[Number(i)]=el.value;curEntry.v[f]=arr;
+  }else curEntry.v[f]=el.value;
+  if(el.tagName==='TEXTAREA')autogrow(el);
+  markDirty();
+}
+function markDirty(){
+  const st=document.getElementById('save-status');if(st)st.textContent='writing…';
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(commitEntry,600);
+}
+function commitEntry(){
+  if(!curEntry||!viewDate)return;
+  putEntry(viewDate,curEntry);
+  const st=document.getElementById('save-status');if(st)st.textContent='saved ✓';
+  const wc=document.getElementById('word-count');if(wc)wc.textContent=wordLabel();
+}
+function setMood(fid,v){curEntry.v[fid]=(curEntry.v[fid]===v?null:v);commitEntry();renderToday(document.getElementById('view'));}
+function switchTpl(id){curEntry.t=id;if(entryHasContent(curEntry))commitEntry();renderToday(document.getElementById('view'));}
+function stepDay(n){flushEntry();const d=parseKey(viewDate);d.setDate(d.getDate()+n);viewDate=dkey(d);showView('today');}
+function goToday(){flushEntry();viewDate=dkey(new Date());showView('today');}
+function openDay(k){flushEntry();viewDate=k;showView('today');}
+function flushEntry(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;if(curEntry&&entryHasContent(curEntry))commitEntry();}}
+function deleteDay(k){
+  if(!confirm('Delete this whole entry, including its photos?'))return;
+  const all=getEntriesRaw();all[k]={deleted:true,updated:Date.now()};saveData('entries',all);
+  curEntry=null;showView('today');
+}
+
+// ── PHOTOS ──
+function setupFileInputs(){
+  document.getElementById('file-cam').onchange=e=>{addPhotos(e.target.files);e.target.value='';};
+  document.getElementById('file-lib').onchange=e=>{addPhotos(e.target.files);e.target.value='';};
+  document.getElementById('import-file').onchange=e=>{importBackup(e.target.files[0]);e.target.value='';};
+}
+async function addPhotos(files){
+  if(!files||!files.length||currentView!=='today')return;
+  for(const f of Array.from(files)){
+    try{const img=await compressImage(f);curEntry.photos=curEntry.photos||[];curEntry.photos.push({id:uid(),img});}catch(e){}
+  }
+  commitEntry();renderToday(document.getElementById('view'));
+}
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onerror=reject;
+    r.onload=ev=>{
+      const im=new Image();
+      im.onerror=reject;
+      im.onload=()=>{
+        const max=1100;let w=im.width,h=im.height;
+        if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(im,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',.72));
+      };
+      im.src=ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function viewPhoto(pid){
+  const p=(curEntry.photos||[]).find(x=>x.id===pid);if(!p)return;
+  openModal(`<div class="photo-full"><img src="${p.img}" alt=""/></div>
+    <div class="set-row"><button class="btn danger" onclick="removePhoto('${pid}')">Remove photo</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Photo');
+}
+function removePhoto(pid){
+  curEntry.photos=(curEntry.photos||[]).filter(x=>x.id!==pid);
+  commitEntry();closeModal();renderToday(document.getElementById('view'));
+}
+
+// ── VOICE ──
+function toggleMic(btn){
+  if(!SR){alert('Voice input is not supported in this browser.');return;}
+  if(rec){const same=btn===recBtn;stopMic();if(same)return;}
+  const wrap=btn.closest('.vfield');const el=wrap&&wrap.querySelector('input,textarea');if(!el)return;
+  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang=navigator.language||'en-GB';
+  recEl=el;recBtn=btn;recBase=el.value?el.value.replace(/\s+$/,'')+' ':'';
+  btn.classList.add('rec');
+  rec.onresult=ev=>{
+    let fin='',inter='';
+    for(let i=0;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fin+=r[0].transcript;else inter+=r[0].transcript;}
+    recEl.value=recBase+fin+inter;
+    onField(recEl);
+  };
+  rec.onerror=e=>{if(e.error==='not-allowed')alert('Microphone access was blocked. Allow the microphone for this site in your browser settings.');};
+  rec.onend=()=>{if(recBtn)recBtn.classList.remove('rec');rec=null;recEl=null;recBtn=null;};
+  try{rec.start();}catch(e){}
+}
+function stopMic(){if(rec){try{rec.stop();}catch(e){}}}
+
+// ── ENTRIES (timeline) ──
+function renderEntries(el){
+  const keys=liveEntryKeys().sort().reverse();
+  const all=getEntriesRaw();
+  const q=searchQ.trim().toLowerCase();
+  const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Entries</div><div class="section-sub">${keys.length} ${keys.length===1?'day':'days'} written</div></div></div>
+  <div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntries(document.getElementById('view'))"/></div>`;
+  if(!shown.length){h+=`<div class="empty-note">${q?'Nothing found for that search.':'No entries yet.<br/>Today is a good day to start.'}</div>`;}
+  else h+=shown.map(k=>{
+    const e=all[k],d=parseKey(k),m=entryMood(e),sn=entrySnippet(e);
+    return `<div class="entry-card" onclick="openDay('${k}')">
+      <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${m?m.e+' ':''}${esc(fmtFull(d))}</span><span class="ec-meta">${esc(templateById(e.t).name)}</span></div>
+      ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
+      ${(e.photos||[]).length?`<div class="ec-photos">${e.photos.slice(0,5).map(p=>`<img src="${p.img}" alt=""/>`).join('')}</div>`:''}
+    </div>`;}).join('');
+  el.innerHTML=h;
+}
+
+// ── CALENDAR ──
+function renderCalendar(el){
+  const now=new Date();
+  if(calYear===null){calYear=now.getFullYear();calMonth=now.getMonth();}
+  const y=calYear,m=calMonth;
+  const keys=liveEntryKeys();
+  const monthKeys=keys.filter(k=>k.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)).sort();
+  const all=getEntriesRaw();
+  // streak
+  let streak=0;const d=new Date();
+  if(!keys.includes(dkey(d)))d.setDate(d.getDate()-1);
+  while(keys.includes(dkey(d))){streak++;d.setDate(d.getDate()-1);}
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Month</div></div></div>
+  <div class="cal-head">
+    <button class="day-step" onclick="calStep(-1)">‹</button>
+    <span class="cal-title" style="font-family:'Cormorant Garamond',serif">${esc(monthName(y,m))}</span>
+    <button class="day-step" onclick="calStep(1)">›</button>
+  </div>
+  <div class="cal-stats"><span><b>${monthKeys.length}</b> ${monthKeys.length===1?'entry':'entries'} this month</span><span><b>${streak}</b> day streak</span></div>
+  <div class="cal-grid">${['M','T','W','T','F','S','S'].map(x=>`<div class="cal-dow">${x}</div>`).join('')}`;
+  const first=new Date(y,m,1);
+  const lead=(first.getDay()+6)%7;
+  const dim=new Date(y,m+1,0).getDate();
+  for(let i=0;i<lead;i++)h+=`<div class="cal-cell"></div>`;
+  const todayKey=dkey(new Date());
+  for(let day=1;day<=dim;day++){
+    const k=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const has=monthKeys.includes(k);
+    const mo=has?entryMood(all[k]):null;
+    h+=`<button class="cal-cell in-month ${k===todayKey?'today':''}" onclick="openDay('${k}')">${mo?`<span class="m-mini">${mo.e}</span>`:''}${day}${has?'<span class="dot"></span>':'<span style="height:5px"></span>'}</button>`;
+  }
+  h+=`</div>
+  <div class="export-block"><div class="export-label">Export ${esc(monthName(y,m))}</div>
+  <div class="export-row">
+    <button class="btn" onclick="downloadMonth(${y},${m})"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Download</button>
+    <button class="btn" onclick="printMonth(${y},${m})"><svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / PDF</button>
+    <button class="btn" onclick="shareMonth(${y},${m})"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>Share text</button>
+  </div></div>`;
+  el.innerHTML=h;
+}
+function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCalendar(document.getElementById('view'));}
+
+// ── EXPORT / SHARE ──
+function dayText(k){
+  const e=getEntry(k);if(!e)return '';
+  const d=parseKey(k),tpl=templateById(e.t);
+  let out=fmtFull(d).toUpperCase()+'\n';
+  tpl.fields.forEach(f=>{
+    const v=e.v[f.id];
+    if(f.type==='mood'){const m=MOODS.find(x=>x.v===v);if(m)out+=`\n${f.label}: ${m.l} ${m.e}\n`;return;}
+    if(Array.isArray(v)){const items=v.map((x,i)=>String(x||'').trim()?`${i+1}. ${x.trim()}`:'').filter(Boolean);if(items.length)out+=`\n${f.label.toUpperCase()}\n${items.join('\n')}\n`;return;}
+    if(String(v||'').trim())out+=`\n${f.label.toUpperCase()}\n${v.trim()}\n`;
+  });
+  return out;
+}
+function dataURLtoBlob(u){const p=u.split(',');const m=p[0].match(/:(.*?);/)[1];const b=atob(p[1]);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:m});}
+async function shareDay(k){
+  flushEntry();
+  const e=getEntry(k);
+  if(!e){alert('Nothing written for this day yet.');return;}
+  const text=dayText(k),title='Daybook — '+fmtLong(parseKey(k));
+  try{
+    if(navigator.canShare&&(e.photos||[]).length){
+      const files=e.photos.map((p,i)=>new File([dataURLtoBlob(p.img)],`photo-${i+1}.jpg`,{type:'image/jpeg'}));
+      if(navigator.canShare({files,text})){await navigator.share({title,text,files});return;}
+    }
+    if(navigator.share){await navigator.share({title,text});return;}
+  }catch(err){if(err&&err.name==='AbortError')return;}
+  try{await navigator.clipboard.writeText(text);alert('Copied to clipboard ✓');}catch(e2){alert(text);}
+}
+function entryHTML(k){
+  const e=getEntry(k);if(!e)return '';
+  const d=parseKey(k),tpl=templateById(e.t),m=entryMood(e);
+  let h=`<article><h2>${m?m.e+' ':''}${esc(fmtFull(d))}</h2>`;
+  tpl.fields.forEach(f=>{
+    const v=e.v[f.id];
+    if(f.type==='mood')return;
+    if(Array.isArray(v)){const items=v.filter(x=>String(x||'').trim());if(items.length)h+=`<h3>${esc(f.label)}</h3><ol>${items.map(x=>`<li>${esc(x.trim())}</li>`).join('')}</ol>`;return;}
+    if(String(v||'').trim())h+=`<h3>${esc(f.label)}</h3><p>${esc(v.trim()).replace(/\n/g,'<br/>')}</p>`;
+  });
+  if((e.photos||[]).length)h+=`<div class="ph">${e.photos.map(p=>`<img src="${p.img}"/>`).join('')}</div>`;
+  return h+'</article>';
+}
+function exportDoc(keys,title){
+  const s=settingsData(),v=themeVars();
+  const f=FONTS.find(x=>x.n===s.font)||FONTS[0];
+  return `<!DOCTYPE html><html lang="en-GB"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(s.font).replace(/%20/g,'+')}:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>body{font-family:${f.css};background:#fff;color:#1c1712;max-width:640px;margin:0 auto;padding:40px 22px;line-height:1.6}
+h1{font-size:1.9rem;border-bottom:3px solid #1c1712;padding-bottom:10px;margin-bottom:8px}
+.sub{font-size:.8rem;letter-spacing:.25em;text-transform:uppercase;color:#998;margin-bottom:36px}
+article{margin-bottom:44px;page-break-inside:avoid}
+h2{font-size:1.3rem;margin-bottom:4px}
+h3{font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;color:#998;margin:18px 0 6px}
+ol{padding-left:22px}li{margin-bottom:4px}p{white-space:normal}
+.ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:16px}
+.ph img{width:100%;border-radius:4px}
+@media print{body{padding:0}}</style></head>
+<body><h1>${esc(title)}</h1><div class="sub">From my Daybook</div>${keys.map(entryHTML).join('')}</body></html>`;
+}
+function download(name,content,type){
+  const b=new Blob([content],{type});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+function downloadDay(k){
+  flushEntry();
+  if(!getEntry(k)){alert('Nothing written for this day yet.');return;}
+  download(`daybook-${k}.html`,exportDoc([k],fmtFull(parseKey(k))),'text/html');
+}
+function monthKeysFor(y,m){return liveEntryKeys().filter(k=>k.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)).sort();}
+function downloadMonth(y,m){
+  const keys=monthKeysFor(y,m);
+  if(!keys.length){alert('No entries this month yet.');return;}
+  download(`daybook-${y}-${String(m+1).padStart(2,'0')}.html`,exportDoc(keys,monthName(y,m)),'text/html');
+}
+function printMonth(y,m){
+  const keys=monthKeysFor(y,m);
+  if(!keys.length){alert('No entries this month yet.');return;}
+  const w=window.open('','_blank');
+  if(!w){alert('Pop-up blocked — allow pop-ups to print.');return;}
+  w.document.write(exportDoc(keys,monthName(y,m)));
+  w.document.close();
+  setTimeout(()=>{try{w.print();}catch(e){}},600);
+}
+async function shareMonth(y,m){
+  const keys=monthKeysFor(y,m);
+  if(!keys.length){alert('No entries this month yet.');return;}
+  const text=monthName(y,m).toUpperCase()+'\n\n'+keys.map(dayText).join('\n──────────\n\n');
+  try{if(navigator.share){await navigator.share({title:'Daybook — '+monthName(y,m),text});return;}}catch(err){if(err&&err.name==='AbortError')return;}
+  try{await navigator.clipboard.writeText(text);alert('Copied to clipboard ✓');}catch(e2){}
+}
+
+// ── BACKUP ──
+function exportBackup(){
+  download(`daybook-backup-${dkey(new Date())}.json`,JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),exported:Date.now()}),'application/json');
+}
+function importBackup(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const p=JSON.parse(ev.target.result);
+      if(!p||typeof p.entries!=='object')throw new Error('bad file');
+      const lE=userData('entries',{});
+      Object.entries(p.entries).forEach(([k,e])=>{const cur=lE[k];if(!cur||(e.updated||0)>(cur.updated||0))lE[k]=e;});
+      saveData('entries',lE);
+      if(Array.isArray(p.templates)){
+        const lT=userData('templates',[]);const byId={};
+        lT.concat(p.templates).forEach(t=>{const c=byId[t.id];if(!c||(t.updated||0)>(c.updated||0))byId[t.id]=t;});
+        saveData('templates',Object.values(byId));
+      }
+      alert('Backup imported ✓');showView('settings');
+    }catch(e){alert('That file could not be read as a Daybook backup.');}
+  };
+  r.readAsText(file);
+}
+
+// ── SETTINGS ──
+function renderSettings(el){
+  const s=settingsData();
+  const driveOn=!!localStorage.getItem(`journal_drive_on_${currentUser}`);
+  const driveErr=sessionStorage.getItem('journal_drive_err')||lastSyncError;
+  let syncBlock;
+  if(currentUser==='local'){
+    syncBlock=`<div class="sync-status">You are using Daybook on this device only.<br/>Sign out and sign in with Google to sync across devices.</div>
+      <div class="set-row"><button class="btn" onclick="signOut()">Go to sign in</button></div>`;
+  }else{
+    syncBlock=`<div class="sync-status">
+      ${driveAccessToken?`<span class="ok">Sync is on ✓</span> — your journal is saved to your Google Drive automatically.`:(driveOn?`Sync was on, but needs reconnecting.`:`Sync is off. Turn it on to keep every device up to date.`)}
+      ${lastSyncAt?`<br/>Last synced ${new Date(lastSyncAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}
+      ${driveErr?`<br/><span class="err">${esc(driveErr)}</span>`:''}
+    </div>
+    <div class="set-row">
+      ${driveAccessToken?`<button class="btn" onclick="driveSyncNow(true)">Sync now</button><button class="btn danger" onclick="disableDriveSync()">Turn off</button>`
+        :`<button class="btn primary" onclick="enableDriveSync()">${driveOn?'Reconnect sync':'Turn on sync'}</button>`}
+    </div>`;
+  }
+  const tplRows=getTemplates().map(t=>`<div class="tpl-list-item">
+      <span class="tli-name">${esc(t.name)}${t.builtin?'<span class="tli-tag">Built-in</span>':''}${t.id===s.defaultTemplate?'<span class="tli-tag" style="color:var(--accent);border-color:var(--accent)">Default</span>':''}</span>
+      <span class="tli-actions">
+        ${t.id!==s.defaultTemplate?`<button class="icon-btn" title="Make default" onclick="saveSettings({defaultTemplate:'${t.id}'});showView('settings')"><svg viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1Z"/></svg></button>`:''}
+        ${t.builtin?`<button class="icon-btn" title="Duplicate & edit" onclick="duplicateTpl('${t.id}')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`
+        :`<button class="icon-btn" title="Edit" onclick="editTpl('${t.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+          <button class="icon-btn" title="Delete" onclick="deleteTpl('${t.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`}
+      </span></div>`).join('');
+  el.innerHTML=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Style</div><div class="section-sub">Make it yours</div></div></div>
+
+  <div class="set-block"><div class="set-label">Theme</div>
+    <div class="theme-grid">
+      ${THEMES.map(t=>`<button class="theme-swatch ${s.theme===t.id?'on':''}" onclick="saveSettings({theme:'${t.id}'});showView('settings')">
+        <span class="ts-dots"><span style="background:${t.v.bg}"></span><span style="background:${t.v.ink}"></span><span style="background:${t.v.accent}"></span></span>
+        <span class="ts-name">${t.name}</span></button>`).join('')}
+      <button class="theme-swatch ${s.theme==='custom'?'on':''}" onclick="saveSettings({theme:'custom'});showView('settings')">
+        <span class="ts-dots"><span style="background:${esc(s.custom.bg)}"></span><span style="background:${esc(s.custom.ink)}"></span><span style="background:${esc(s.custom.accent)}"></span></span>
+        <span class="ts-name">Custom</span></button>
+    </div>
+    ${s.theme==='custom'?`<div class="custom-colors">
+      <label class="cc-item"><input type="color" value="${esc(s.custom.bg)}" onchange="setCustomColor('bg',this.value)"/>Page</label>
+      <label class="cc-item"><input type="color" value="${esc(s.custom.ink)}" onchange="setCustomColor('ink',this.value)"/>Ink</label>
+      <label class="cc-item"><input type="color" value="${esc(s.custom.accent)}" onchange="setCustomColor('accent',this.value)"/>Accent</label>
+    </div>`:''}
+  </div>
+
+  <div class="set-block"><div class="set-label">Font</div>
+    <div class="font-list">${FONTS.map(f=>`<button class="font-opt ${s.font===f.n?'on':''}" style="font-family:${f.css}" onclick="saveSettings({font:'${f.n}'});showView('settings')">${f.n}<small>${f.tag}</small></button>`).join('')}</div>
+  </div>
+
+  <div class="set-block"><div class="set-label">Text size</div>
+    <div class="size-row">${[['s','Small'],['m','Medium'],['l','Large'],['xl','Extra']].map(([id,n])=>`<button class="size-opt ${s.size===id?'on':''}" onclick="saveSettings({size:'${id}'});showView('settings')">${n}</button>`).join('')}</div>
+  </div>
+
+  <div class="set-block"><div class="set-label">Daily templates</div>
+    ${tplRows}
+    <div style="margin-top:12px"><button class="btn" onclick="editTpl(null)">+ Design your own</button></div>
+  </div>
+
+  <div class="set-block"><div class="set-label">Sync</div>${syncBlock}</div>
+
+  <div class="set-block"><div class="set-label">Your data</div>
+    <div class="set-row">
+      <button class="btn" onclick="exportBackup()">Download full backup</button>
+      <button class="btn" onclick="document.getElementById('import-file').click()">Import backup</button>
+    </div>
+  </div>
+
+  <div class="set-block"><div class="set-label">Account</div>
+    <div class="signed-in-as">${currentUser==='local'?'Using on this device only.':`Signed in as <b>${esc(currentUserName)}</b>${currentUserEmail?` (${esc(currentUserEmail)})`:''}`}</div>
+    <div class="set-row"><button class="btn" onclick="signOut()">Sign out</button></div>
+  </div>`;
+}
+function setCustomColor(k,val){const s=settingsData();const c=Object.assign({},s.custom);c[k]=val;saveSettings({custom:c});showView('settings');}
+
+// ── TEMPLATE BUILDER ──
+function editTpl(id){
+  if(id){const t=customTemplates().find(x=>x.id===id);if(!t)return;editingTpl=JSON.parse(JSON.stringify(t));}
+  else editingTpl={id:'c'+uid(),name:'',fields:[{id:uid(),type:'long',label:'How was today?'}],created:Date.now()};
+  renderTplModal();
+}
+function duplicateTpl(id){
+  const t=templateById(id);
+  editingTpl=JSON.parse(JSON.stringify(t));
+  editingTpl.id='c'+uid();editingTpl.name=t.name+' (mine)';delete editingTpl.builtin;editingTpl.created=Date.now();
+  editingTpl.fields.forEach(f=>f.id=uid());
+  renderTplModal();
+}
+function renderTplModal(){
+  const t=editingTpl;
+  const typeOpts=[['text','Short answer'],['long','Long text'],['list','Numbered list'],['mood','Mood']];
+  const body=`<div class="tb-name"><input placeholder="Template name (e.g. Evening Reflection)" value="${esc(t.name)}" oninput="editingTpl.name=this.value"/></div>
+  ${t.fields.map((f,i)=>`<div class="tb-field">
+    <div class="tb-field-top"><input placeholder="Question or prompt…" value="${esc(f.label)}" oninput="editingTpl.fields[${i}].label=this.value"/></div>
+    <div class="tb-field-bottom">
+      <select onchange="tbType(${i},this.value)">${typeOpts.map(([v,n])=>`<option value="${v}" ${f.type===v?'selected':''}>${n}</option>`).join('')}</select>
+      ${f.type==='list'?`<select onchange="editingTpl.fields[${i}].count=Number(this.value);renderTplModal()">${[2,3,4,5].map(n=>`<option ${f.count===n?'selected':''}>${n}</option>`).join('')}</select><span style="font-size:.72rem;color:var(--muted);font-style:italic">items</span>`:''}
+      <span style="flex:1"></span>
+      ${i>0?`<button class="icon-btn" onclick="tbMove(${i},-1)" title="Move up"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>`:''}
+      ${i<t.fields.length-1?`<button class="icon-btn" onclick="tbMove(${i},1)" title="Move down"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`:''}
+      <button class="icon-btn" onclick="tbRemove(${i})" title="Remove"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div></div>`).join('')}
+  <button class="btn small" onclick="tbAdd()">+ Add a question</button>
+  <div class="tb-actions">
+    <button class="btn primary" onclick="saveTpl()">Save template</button>
+    <button class="btn" onclick="closeModal()">Cancel</button>
+  </div>`;
+  openModal(body,editingTpl.name?'Edit template':'New template');
+}
+function tbType(i,v){editingTpl.fields[i].type=v;if(v==='list'&&!editingTpl.fields[i].count)editingTpl.fields[i].count=3;renderTplModal();}
+function tbAdd(){editingTpl.fields.push({id:uid(),type:'text',label:''});renderTplModal();}
+function tbRemove(i){editingTpl.fields.splice(i,1);renderTplModal();}
+function tbMove(i,n){const f=editingTpl.fields;const x=f.splice(i,1)[0];f.splice(i+n,0,x);renderTplModal();}
+function saveTpl(){
+  const t=editingTpl;
+  t.name=(t.name||'').trim()||'My template';
+  t.fields=t.fields.filter(f=>(f.label||'').trim());
+  if(!t.fields.length){alert('Add at least one question with a label.');return;}
+  const all=userData('templates',[]);
+  const idx=all.findIndex(x=>x.id===t.id);
+  t.updated=Date.now();
+  if(idx>=0)all[idx]=t;else all.push(t);
+  saveData('templates',all);
+  editingTpl=null;closeModal();showView('settings');
+}
+function deleteTpl(id){
+  if(!confirm('Delete this template? Entries written with it keep their text.'))return;
+  const all=userData('templates',[]);
+  const idx=all.findIndex(x=>x.id===id);
+  if(idx>=0){all[idx]={id,deleted:true,updated:Date.now()};saveData('templates',all);}
+  const s=settingsData();
+  if(s.defaultTemplate===id)saveSettings({defaultTemplate:'tgt'});
+  showView('settings');
+}
+
+// ── MODAL ──
+function openModal(body,title){
+  document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box"><div class="modal-head"><span class="modal-title" style="font-family:'Cormorant Garamond',serif">${esc(title||'')}</span><button class="modal-close" onclick="closeModal()">×</button></div>${body}</div></div>`;
+}
+function closeModal(){document.getElementById('modal-root').innerHTML='';}
+</script>
+</body>
+</html>
