@@ -266,7 +266,7 @@ let currentUser=null,currentUserEmail=null,currentUserName='';
 let currentView='today',viewDate=null,curEntry=null,saveTimer=null;
 let calYear=null,calMonth=null,searchQ='';
 let driveAccessToken=null,driveFileId=null,driveSyncTimer=null,lastSyncAt=null,lastSyncError=null;
-let msPickStack=null,msBackupTimer=null,lastMsBackupAt=null,lastMsBackupError=null;
+let bkPickStack=null,bkBackupTimer=null,lastBkBackupAt=null,lastBkBackupError=null;
 let editingTpl=null;
 let rec=null,recEl=null,recBtn=null,recBase='';
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -278,7 +278,7 @@ function getStore(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v
 function setStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){alert('Storage is full — try removing some photos from older entries.');}}
 function userKey(k){return `journal_${currentUser}_${k}`;}
 function userData(k,d){return getStore(userKey(k),d);}
-function saveData(k,v){setStore(userKey(k),v);scheduleDriveSync();scheduleMsBackup();}
+function saveData(k,v){setStore(userKey(k),v);scheduleDriveSync();scheduleBkBackup();}
 function dkey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseKey(k){const p=k.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
 function fmtDow(d){return d.toLocaleDateString('en-GB',{weekday:'long'});}
@@ -355,7 +355,7 @@ function signOut(){
 }
 window.addEventListener('load',()=>{
   checkDriveRedirect();
-  checkMsRedirect();
+  checkBkDriveRedirect();
   try{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
@@ -476,132 +476,114 @@ async function pushToDrive(){
   }
 }
 
-// ── ONEDRIVE BACKUP (Microsoft Graph) ──
-const MS_CLIENT_ID='PASTE_YOUR_MICROSOFT_CLIENT_ID_HERE';
-const MS_REDIRECT=location.origin+location.pathname;
-const MS_SCOPES='Files.ReadWrite offline_access';
-const MS_BACKUP_FILENAME='daybook-backup.json';
-function b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
-async function sha256Buf(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));}
-function randVerifier(){const a=new Uint8Array(32);crypto.getRandomValues(a);return b64url(a.buffer);}
-async function msAuthRedirect(){
-  const verifier=randVerifier();
-  sessionStorage.setItem('daybook_ms_verifier',verifier);
-  const challenge=b64url(await sha256Buf(verifier));
-  const p=new URLSearchParams({client_id:MS_CLIENT_ID,response_type:'code',redirect_uri:MS_REDIRECT,response_mode:'query',scope:MS_SCOPES,state:'daybook_ms',code_challenge:challenge,code_challenge_method:'S256',prompt:'select_account'});
-  location.href='https://login.microsoftonline.com/common/oauth2/v2.0/authorize?'+p.toString();
+// ── GOOGLE DRIVE BACKUP (visible folder, separate from the invisible sync above) ──
+const BACKUP_DRIVE_SCOPE='https://www.googleapis.com/auth/drive';
+const BACKUP_FILENAME='daybook-backup.json';
+function getBkToken(){try{const t=JSON.parse(localStorage.getItem('journal_bkdrive_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
+function hasBkToken(){return !!getBkToken();}
+function bkTokenInvalid(){localStorage.removeItem('journal_bkdrive_tok');}
+function bkDriveAuthRedirect(){
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:BACKUP_DRIVE_SCOPE,state:'daybook_bkdrive',include_granted_scopes:'true',prompt:'consent'});
+  if(currentUserEmail)p.set('login_hint',currentUserEmail);
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
 }
-async function checkMsRedirect(){
-  const q=new URLSearchParams(location.search);
-  if(q.get('state')!=='daybook_ms')return;
-  const err=q.get('error'),code=q.get('code');
-  history.replaceState(null,'',location.pathname+location.hash);
-  if(err){alert('Microsoft sign-in failed: '+(q.get('error_description')||err));return;}
-  if(!code)return;
-  const verifier=sessionStorage.getItem('daybook_ms_verifier')||'';
-  sessionStorage.removeItem('daybook_ms_verifier');
-  try{
-    const body=new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'authorization_code',code,redirect_uri:MS_REDIRECT,code_verifier:verifier});
-    const r=await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
-    const j=await r.json();
-    if(j.access_token){
-      const exp=Date.now()+((j.expires_in||3600)-60)*1000;
-      localStorage.setItem('daybook_ms_tok',JSON.stringify({tok:j.access_token,refresh:j.refresh_token||null,exp}));
-      showView('settings');
-    }else alert('Microsoft sign-in failed: '+(j.error_description||j.error||'unknown error'));
-  }catch(e){alert('Microsoft sign-in failed: '+e.message);}
-}
-function hasMsToken(){try{const t=JSON.parse(localStorage.getItem('daybook_ms_tok')||'null');return !!(t&&t.tok);}catch(e){return false;}}
-async function getMsToken(){
-  let t;try{t=JSON.parse(localStorage.getItem('daybook_ms_tok')||'null');}catch(e){t=null;}
-  if(t&&t.exp>Date.now())return t.tok;
-  if(t&&t.refresh){
-    try{
-      const body=new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'refresh_token',refresh_token:t.refresh,scope:MS_SCOPES});
-      const r=await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
-      const j=await r.json();
-      if(j.access_token){
-        const nt={tok:j.access_token,refresh:j.refresh_token||t.refresh,exp:Date.now()+((j.expires_in||3600)-60)*1000};
-        localStorage.setItem('daybook_ms_tok',JSON.stringify(nt));
-        return nt.tok;
-      }
-    }catch(e){}
+function checkBkDriveRedirect(){
+  if(!location.hash)return;
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('state')!=='daybook_bkdrive')return;
+  const err=h.get('error');
+  if(err){alert('Google Drive connection failed: '+err);}
+  else if(h.get('access_token')){
+    const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
+    localStorage.setItem('journal_bkdrive_tok',JSON.stringify({tok:h.get('access_token'),exp}));
   }
-  localStorage.removeItem('daybook_ms_tok');
-  return null;
+  history.replaceState(null,'',location.pathname+location.search);
 }
-function msDisconnect(){
-  if(!confirm('Disconnect your Microsoft account? Automatic OneDrive backup will stop.'))return;
-  localStorage.removeItem('daybook_ms_tok');
+function bkDisconnect(){
+  if(!confirm('Disconnect Google Drive backup? The folder you already backed up to keeps its file, but it will stop updating.'))return;
+  bkTokenInvalid();
   const s=settingsData();
-  saveSettings({oneDrive:Object.assign({},s.oneDrive,{enabled:false,folderId:null,folderName:null})});
+  saveSettings({gdriveBackup:Object.assign({},s.gdriveBackup,{enabled:false,folderId:null,folderName:null})});
   showView('settings');
 }
-async function openMsFolderPicker(){
-  const token=await getMsToken();
-  if(!token){alert('Connect your Microsoft account first.');return;}
-  msPickStack=[{id:'root',name:'OneDrive'}];
-  await renderMsPicker();
+async function bkFetch(url,opts){
+  const res=await fetch(url,opts);
+  if(res.status===401){bkTokenInvalid();throw new Error('Google sign-in expired — reconnect in Settings.');}
+  if(!res.ok)throw new Error('Drive error '+res.status);
+  return res;
 }
-async function renderMsPicker(){
-  const token=await getMsToken();
-  if(!token){closeModal();alert('Your Microsoft sign-in expired — reconnect in Settings.');return;}
-  const cur=msPickStack[msPickStack.length-1];
-  const url=cur.id==='root'?'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,folder&$top=200':`https://graph.microsoft.com/v1.0/me/drive/items/${cur.id}/children?$select=id,name,folder&$top=200`;
+async function openBkFolderPicker(){
+  const token=getBkToken();
+  if(!token){alert('Connect Google Drive first.');return;}
+  bkPickStack=[{id:'root',name:'My Drive'}];
+  await renderBkPicker();
+}
+async function renderBkPicker(){
+  const token=getBkToken();
+  if(!token){closeModal();alert('Your Google Drive connection expired — reconnect in Settings.');return;}
+  const cur=bkPickStack[bkPickStack.length-1];
+  const q=encodeURIComponent(`'${cur.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
   let items=[];
   try{
-    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
-    if(!r.ok)throw new Error('OneDrive error '+r.status);
+    const r=await bkFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=200&orderBy=name`,{headers:{Authorization:'Bearer '+token}});
     const j=await r.json();
-    items=(j.value||[]).filter(x=>x.folder);
+    items=j.files||[];
   }catch(e){
-    openModal(`<p style="color:var(--accent)">Could not list your OneDrive folders: ${esc(e.message)}</p><div class="tb-actions"><button class="btn" onclick="closeModal()">Close</button></div>`,'OneDrive');
+    openModal(`<p style="color:var(--accent)">Could not list your Drive folders: ${esc(e.message)}</p><div class="tb-actions"><button class="btn" onclick="closeModal()">Close</button></div>`,'Google Drive');
     return;
   }
-  const crumb=msPickStack.map((s,i)=>`<button class="btn small" onclick="msPickStack=msPickStack.slice(0,${i+1});renderMsPicker()">${esc(s.name)}</button>`).join(' / ');
-  const rows=items.map(it=>`<div class="tpl-list-item"><span class="tli-name">${esc(it.name)}</span><span class="tli-actions"><button class="btn small" onclick='msPickStack=msPickStack.concat([{id:"${it.id}",name:${JSON.stringify(it.name)}}]);renderMsPicker()'>Open</button></span></div>`).join('')||'<div class="empty-note">No folders here.</div>';
+  const crumb=bkPickStack.map((s,i)=>`<button class="btn small" onclick="bkPickStack=bkPickStack.slice(0,${i+1});renderBkPicker()">${esc(s.name)}</button>`).join(' / ');
+  const rows=items.map(it=>`<div class="tpl-list-item"><span class="tli-name">${esc(it.name)}</span><span class="tli-actions"><button class="btn small" onclick='bkPickStack=bkPickStack.concat([{id:"${it.id}",name:${JSON.stringify(it.name)}}]);renderBkPicker()'>Open</button></span></div>`).join('')||'<div class="empty-note">No folders here.</div>';
   const body=`<div style="margin-bottom:10px;font-size:.8rem">${crumb}</div>
     <div style="max-height:320px;overflow-y:auto">${rows}</div>
     <div class="tb-actions">
-      <button class="btn primary" onclick='chooseMsFolder("${cur.id}",${JSON.stringify(cur.name)})'>Save backups in "${esc(cur.name)}"</button>
+      <button class="btn primary" onclick='chooseBkFolder("${cur.id}",${JSON.stringify(cur.name)})'>Save backups in "${esc(cur.name)}"</button>
       <button class="btn" onclick="closeModal()">Cancel</button>
     </div>`;
-  openModal(body,'Choose a OneDrive folder');
+  openModal(body,'Choose a Google Drive folder');
 }
-function chooseMsFolder(id,name){
+function chooseBkFolder(id,name){
   const s=settingsData();
-  saveSettings({oneDrive:Object.assign({},s.oneDrive,{enabled:true,folderId:id,folderName:name})});
+  saveSettings({gdriveBackup:Object.assign({},s.gdriveBackup,{enabled:true,folderId:id,folderName:name})});
   closeModal();showView('settings');
-  msBackupNow(false);
+  bkBackupNow(false);
 }
-function toggleMsBackup(){
-  const s=settingsData();const od=Object.assign({},s.oneDrive);od.enabled=!od.enabled;
-  saveSettings({oneDrive:od});showView('settings');
-  if(od.enabled)msBackupNow(false);
+function toggleBkBackup(){
+  const s=settingsData();const gd=Object.assign({},s.gdriveBackup);gd.enabled=!gd.enabled;
+  saveSettings({gdriveBackup:gd});showView('settings');
+  if(gd.enabled)bkBackupNow(false);
 }
-async function msBackupNow(manual){
-  const s=settingsData(),od=s.oneDrive||{};
-  if(!od.enabled||!od.folderId)return;
-  const token=await getMsToken();
-  if(!token){if(manual)alert('Reconnect your Microsoft account in Settings.');return;}
+async function bkBackupNow(manual){
+  const s=settingsData(),gd=s.gdriveBackup||{};
+  if(!gd.enabled||!gd.folderId)return;
+  const token=getBkToken();
+  if(!token){if(manual)alert('Reconnect Google Drive backup in Settings.');return;}
   const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),exported:Date.now()});
-  const path=od.folderId==='root'
-    ?`https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(MS_BACKUP_FILENAME)}:/content`
-    :`https://graph.microsoft.com/v1.0/me/drive/items/${od.folderId}:/${encodeURIComponent(MS_BACKUP_FILENAME)}:/content`;
   try{
-    const r=await fetch(path,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});
-    if(!r.ok)throw new Error('OneDrive error '+r.status);
-    lastMsBackupAt=Date.now();lastMsBackupError=null;
-    if(manual){alert('Backed up to OneDrive ✓');showView('settings');}
+    const auth={headers:{Authorization:'Bearer '+token}};
+    const q=encodeURIComponent(`'${gd.folderId}' in parents and name='${BACKUP_FILENAME}' and trashed=false`);
+    const lr=await bkFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,auth);
+    const lj=await lr.json();
+    const existing=(lj.files||[])[0];
+    if(existing){
+      await bkFetch(`https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});
+    }else{
+      const form=new FormData();
+      form.append('metadata',new Blob([JSON.stringify({name:BACKUP_FILENAME,parents:[gd.folderId]})],{type:'application/json'}));
+      form.append('file',new Blob([body],{type:'application/json'}));
+      await bkFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{Authorization:'Bearer '+token},body:form});
+    }
+    lastBkBackupAt=Date.now();lastBkBackupError=null;
+    if(manual){alert('Backed up to Google Drive ✓');showView('settings');}
   }catch(e){
-    lastMsBackupError=e.message;
+    lastBkBackupError=e.message;
     if(manual)alert('Backup failed: '+e.message);
   }
 }
-function scheduleMsBackup(){
-  const s=settingsData();if(!(s.oneDrive&&s.oneDrive.enabled))return;
-  if(msBackupTimer)clearTimeout(msBackupTimer);
-  msBackupTimer=setTimeout(()=>msBackupNow(false),4000);
+function scheduleBkBackup(){
+  const s=settingsData();if(!(s.gdriveBackup&&s.gdriveBackup.enabled))return;
+  if(bkBackupTimer)clearTimeout(bkBackupTimer);
+  bkBackupTimer=setTimeout(()=>bkBackupNow(false),4000);
 }
 
 // ── NAV ──
@@ -961,26 +943,26 @@ function renderSettings(el){
         :`<button class="btn primary" onclick="enableDriveSync()">${driveOn?'Reconnect sync':'Turn on sync'}</button>`}
     </div>`;
   }
-  const od=s.oneDrive||{};
-  const msConnected=hasMsToken();
-  let odBlock;
-  if(!msConnected){
-    odBlock=`<div class="sync-status">Keep an automatic copy of your journal in your own OneDrive.</div>
-      <div class="set-row"><button class="btn primary" onclick="msAuthRedirect()">Connect Microsoft account</button></div>`;
-  }else if(!od.folderId){
-    odBlock=`<div class="sync-status">Connected. Choose a folder in your OneDrive to back up into.</div>
-      <div class="set-row"><button class="btn primary" onclick="openMsFolderPicker()">Choose folder</button><button class="btn danger" onclick="msDisconnect()">Disconnect</button></div>`;
+  const gd=s.gdriveBackup||{};
+  const bkConnected=hasBkToken();
+  let gdBlock;
+  if(!bkConnected){
+    gdBlock=`<div class="sync-status">Keep a visible backup file in a Google Drive folder you choose — separate from the automatic sync above. Connecting asks for a broader Google Drive permission, so you may see an "unverified app" notice; that's expected for this project and safe to continue through.</div>
+      <div class="set-row"><button class="btn primary" onclick="bkDriveAuthRedirect()">Connect Google Drive backup</button></div>`;
+  }else if(!gd.folderId){
+    gdBlock=`<div class="sync-status">Connected. Choose a folder in your Google Drive to back up into.</div>
+      <div class="set-row"><button class="btn primary" onclick="openBkFolderPicker()">Choose folder</button><button class="btn danger" onclick="bkDisconnect()">Disconnect</button></div>`;
   }else{
-    odBlock=`<div class="sync-status">
-      Backing up to <b>${esc(od.folderName||'OneDrive')}</b> ${od.enabled?'<span class="ok">— on ✓</span>':'— paused'}
-      ${lastMsBackupAt?`<br/>Last backed up ${new Date(lastMsBackupAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}
-      ${lastMsBackupError?`<br/><span class="err">${esc(lastMsBackupError)}</span>`:''}
+    gdBlock=`<div class="sync-status">
+      Backing up to <b>${esc(gd.folderName||'Google Drive')}</b> ${gd.enabled?'<span class="ok">— on ✓</span>':'— paused'}
+      ${lastBkBackupAt?`<br/>Last backed up ${new Date(lastBkBackupAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}
+      ${lastBkBackupError?`<br/><span class="err">${esc(lastBkBackupError)}</span>`:''}
     </div>
     <div class="set-row">
-      <button class="btn" onclick="msBackupNow(true)">Back up now</button>
-      <button class="btn" onclick="toggleMsBackup()">${od.enabled?'Pause':'Resume'}</button>
-      <button class="btn" onclick="openMsFolderPicker()">Change folder</button>
-      <button class="btn danger" onclick="msDisconnect()">Disconnect</button>
+      <button class="btn" onclick="bkBackupNow(true)">Back up now</button>
+      <button class="btn" onclick="toggleBkBackup()">${gd.enabled?'Pause':'Resume'}</button>
+      <button class="btn" onclick="openBkFolderPicker()">Change folder</button>
+      <button class="btn danger" onclick="bkDisconnect()">Disconnect</button>
     </div>`;
   }
   const tplRows=getTemplates().map(t=>`<div class="tpl-list-item">
@@ -1024,7 +1006,7 @@ function renderSettings(el){
 
   <div class="set-block"><div class="set-label">Sync</div>${syncBlock}</div>
 
-  <div class="set-block"><div class="set-label">OneDrive backup</div>${odBlock}</div>
+  <div class="set-block"><div class="set-label">Google Drive backup</div>${gdBlock}</div>
 
   <div class="set-block"><div class="set-label">Your data</div>
     <div class="set-row">
