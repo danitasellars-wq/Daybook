@@ -266,6 +266,7 @@ let currentUser=null,currentUserEmail=null,currentUserName='';
 let currentView='today',viewDate=null,curEntry=null,saveTimer=null;
 let calYear=null,calMonth=null,searchQ='';
 let driveAccessToken=null,driveFileId=null,driveSyncTimer=null,lastSyncAt=null,lastSyncError=null;
+let msPickStack=null,msBackupTimer=null,lastMsBackupAt=null,lastMsBackupError=null;
 let editingTpl=null;
 let rec=null,recEl=null,recBtn=null,recBase='';
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -277,7 +278,7 @@ function getStore(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v
 function setStore(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){alert('Storage is full — try removing some photos from older entries.');}}
 function userKey(k){return `journal_${currentUser}_${k}`;}
 function userData(k,d){return getStore(userKey(k),d);}
-function saveData(k,v){setStore(userKey(k),v);scheduleDriveSync();}
+function saveData(k,v){setStore(userKey(k),v);scheduleDriveSync();scheduleMsBackup();}
 function dkey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseKey(k){const p=k.split('-').map(Number);return new Date(p[0],p[1]-1,p[2]);}
 function fmtDow(d){return d.toLocaleDateString('en-GB',{weekday:'long'});}
@@ -354,6 +355,7 @@ function signOut(){
 }
 window.addEventListener('load',()=>{
   checkDriveRedirect();
+  checkMsRedirect();
   try{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
@@ -472,6 +474,134 @@ async function pushToDrive(){
     const created=await cr.json();
     if(created.id)driveFileId=created.id;
   }
+}
+
+// ── ONEDRIVE BACKUP (Microsoft Graph) ──
+const MS_CLIENT_ID='PASTE_YOUR_MICROSOFT_CLIENT_ID_HERE';
+const MS_REDIRECT=location.origin+location.pathname;
+const MS_SCOPES='Files.ReadWrite offline_access';
+const MS_BACKUP_FILENAME='daybook-backup.json';
+function b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+async function sha256Buf(str){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));}
+function randVerifier(){const a=new Uint8Array(32);crypto.getRandomValues(a);return b64url(a.buffer);}
+async function msAuthRedirect(){
+  const verifier=randVerifier();
+  sessionStorage.setItem('daybook_ms_verifier',verifier);
+  const challenge=b64url(await sha256Buf(verifier));
+  const p=new URLSearchParams({client_id:MS_CLIENT_ID,response_type:'code',redirect_uri:MS_REDIRECT,response_mode:'query',scope:MS_SCOPES,state:'daybook_ms',code_challenge:challenge,code_challenge_method:'S256',prompt:'select_account'});
+  location.href='https://login.microsoftonline.com/common/oauth2/v2.0/authorize?'+p.toString();
+}
+async function checkMsRedirect(){
+  const q=new URLSearchParams(location.search);
+  if(q.get('state')!=='daybook_ms')return;
+  const err=q.get('error'),code=q.get('code');
+  history.replaceState(null,'',location.pathname+location.hash);
+  if(err){alert('Microsoft sign-in failed: '+(q.get('error_description')||err));return;}
+  if(!code)return;
+  const verifier=sessionStorage.getItem('daybook_ms_verifier')||'';
+  sessionStorage.removeItem('daybook_ms_verifier');
+  try{
+    const body=new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'authorization_code',code,redirect_uri:MS_REDIRECT,code_verifier:verifier});
+    const r=await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+    const j=await r.json();
+    if(j.access_token){
+      const exp=Date.now()+((j.expires_in||3600)-60)*1000;
+      localStorage.setItem('daybook_ms_tok',JSON.stringify({tok:j.access_token,refresh:j.refresh_token||null,exp}));
+      showView('settings');
+    }else alert('Microsoft sign-in failed: '+(j.error_description||j.error||'unknown error'));
+  }catch(e){alert('Microsoft sign-in failed: '+e.message);}
+}
+function hasMsToken(){try{const t=JSON.parse(localStorage.getItem('daybook_ms_tok')||'null');return !!(t&&t.tok);}catch(e){return false;}}
+async function getMsToken(){
+  let t;try{t=JSON.parse(localStorage.getItem('daybook_ms_tok')||'null');}catch(e){t=null;}
+  if(t&&t.exp>Date.now())return t.tok;
+  if(t&&t.refresh){
+    try{
+      const body=new URLSearchParams({client_id:MS_CLIENT_ID,grant_type:'refresh_token',refresh_token:t.refresh,scope:MS_SCOPES});
+      const r=await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+      const j=await r.json();
+      if(j.access_token){
+        const nt={tok:j.access_token,refresh:j.refresh_token||t.refresh,exp:Date.now()+((j.expires_in||3600)-60)*1000};
+        localStorage.setItem('daybook_ms_tok',JSON.stringify(nt));
+        return nt.tok;
+      }
+    }catch(e){}
+  }
+  localStorage.removeItem('daybook_ms_tok');
+  return null;
+}
+function msDisconnect(){
+  if(!confirm('Disconnect your Microsoft account? Automatic OneDrive backup will stop.'))return;
+  localStorage.removeItem('daybook_ms_tok');
+  const s=settingsData();
+  saveSettings({oneDrive:Object.assign({},s.oneDrive,{enabled:false,folderId:null,folderName:null})});
+  showView('settings');
+}
+async function openMsFolderPicker(){
+  const token=await getMsToken();
+  if(!token){alert('Connect your Microsoft account first.');return;}
+  msPickStack=[{id:'root',name:'OneDrive'}];
+  await renderMsPicker();
+}
+async function renderMsPicker(){
+  const token=await getMsToken();
+  if(!token){closeModal();alert('Your Microsoft sign-in expired — reconnect in Settings.');return;}
+  const cur=msPickStack[msPickStack.length-1];
+  const url=cur.id==='root'?'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,folder&$top=200':`https://graph.microsoft.com/v1.0/me/drive/items/${cur.id}/children?$select=id,name,folder&$top=200`;
+  let items=[];
+  try{
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(!r.ok)throw new Error('OneDrive error '+r.status);
+    const j=await r.json();
+    items=(j.value||[]).filter(x=>x.folder);
+  }catch(e){
+    openModal(`<p style="color:var(--accent)">Could not list your OneDrive folders: ${esc(e.message)}</p><div class="tb-actions"><button class="btn" onclick="closeModal()">Close</button></div>`,'OneDrive');
+    return;
+  }
+  const crumb=msPickStack.map((s,i)=>`<button class="btn small" onclick="msPickStack=msPickStack.slice(0,${i+1});renderMsPicker()">${esc(s.name)}</button>`).join(' / ');
+  const rows=items.map(it=>`<div class="tpl-list-item"><span class="tli-name">${esc(it.name)}</span><span class="tli-actions"><button class="btn small" onclick='msPickStack=msPickStack.concat([{id:"${it.id}",name:${JSON.stringify(it.name)}}]);renderMsPicker()'>Open</button></span></div>`).join('')||'<div class="empty-note">No folders here.</div>';
+  const body=`<div style="margin-bottom:10px;font-size:.8rem">${crumb}</div>
+    <div style="max-height:320px;overflow-y:auto">${rows}</div>
+    <div class="tb-actions">
+      <button class="btn primary" onclick='chooseMsFolder("${cur.id}",${JSON.stringify(cur.name)})'>Save backups in "${esc(cur.name)}"</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(body,'Choose a OneDrive folder');
+}
+function chooseMsFolder(id,name){
+  const s=settingsData();
+  saveSettings({oneDrive:Object.assign({},s.oneDrive,{enabled:true,folderId:id,folderName:name})});
+  closeModal();showView('settings');
+  msBackupNow(false);
+}
+function toggleMsBackup(){
+  const s=settingsData();const od=Object.assign({},s.oneDrive);od.enabled=!od.enabled;
+  saveSettings({oneDrive:od});showView('settings');
+  if(od.enabled)msBackupNow(false);
+}
+async function msBackupNow(manual){
+  const s=settingsData(),od=s.oneDrive||{};
+  if(!od.enabled||!od.folderId)return;
+  const token=await getMsToken();
+  if(!token){if(manual)alert('Reconnect your Microsoft account in Settings.');return;}
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),exported:Date.now()});
+  const path=od.folderId==='root'
+    ?`https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(MS_BACKUP_FILENAME)}:/content`
+    :`https://graph.microsoft.com/v1.0/me/drive/items/${od.folderId}:/${encodeURIComponent(MS_BACKUP_FILENAME)}:/content`;
+  try{
+    const r=await fetch(path,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body});
+    if(!r.ok)throw new Error('OneDrive error '+r.status);
+    lastMsBackupAt=Date.now();lastMsBackupError=null;
+    if(manual){alert('Backed up to OneDrive ✓');showView('settings');}
+  }catch(e){
+    lastMsBackupError=e.message;
+    if(manual)alert('Backup failed: '+e.message);
+  }
+}
+function scheduleMsBackup(){
+  const s=settingsData();if(!(s.oneDrive&&s.oneDrive.enabled))return;
+  if(msBackupTimer)clearTimeout(msBackupTimer);
+  msBackupTimer=setTimeout(()=>msBackupNow(false),4000);
 }
 
 // ── NAV ──
@@ -831,6 +961,28 @@ function renderSettings(el){
         :`<button class="btn primary" onclick="enableDriveSync()">${driveOn?'Reconnect sync':'Turn on sync'}</button>`}
     </div>`;
   }
+  const od=s.oneDrive||{};
+  const msConnected=hasMsToken();
+  let odBlock;
+  if(!msConnected){
+    odBlock=`<div class="sync-status">Keep an automatic copy of your journal in your own OneDrive.</div>
+      <div class="set-row"><button class="btn primary" onclick="msAuthRedirect()">Connect Microsoft account</button></div>`;
+  }else if(!od.folderId){
+    odBlock=`<div class="sync-status">Connected. Choose a folder in your OneDrive to back up into.</div>
+      <div class="set-row"><button class="btn primary" onclick="openMsFolderPicker()">Choose folder</button><button class="btn danger" onclick="msDisconnect()">Disconnect</button></div>`;
+  }else{
+    odBlock=`<div class="sync-status">
+      Backing up to <b>${esc(od.folderName||'OneDrive')}</b> ${od.enabled?'<span class="ok">— on ✓</span>':'— paused'}
+      ${lastMsBackupAt?`<br/>Last backed up ${new Date(lastMsBackupAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`:''}
+      ${lastMsBackupError?`<br/><span class="err">${esc(lastMsBackupError)}</span>`:''}
+    </div>
+    <div class="set-row">
+      <button class="btn" onclick="msBackupNow(true)">Back up now</button>
+      <button class="btn" onclick="toggleMsBackup()">${od.enabled?'Pause':'Resume'}</button>
+      <button class="btn" onclick="openMsFolderPicker()">Change folder</button>
+      <button class="btn danger" onclick="msDisconnect()">Disconnect</button>
+    </div>`;
+  }
   const tplRows=getTemplates().map(t=>`<div class="tpl-list-item">
       <span class="tli-name">${esc(t.name)}${t.builtin?'<span class="tli-tag">Built-in</span>':''}${t.id===s.defaultTemplate?'<span class="tli-tag" style="color:var(--accent);border-color:var(--accent)">Default</span>':''}</span>
       <span class="tli-actions">
@@ -871,6 +1023,8 @@ function renderSettings(el){
   </div>
 
   <div class="set-block"><div class="set-label">Sync</div>${syncBlock}</div>
+
+  <div class="set-block"><div class="set-label">OneDrive backup</div>${odBlock}</div>
 
   <div class="set-block"><div class="set-label">Your data</div>
     <div class="set-row">
