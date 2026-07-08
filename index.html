@@ -91,10 +91,14 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 .photo-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:10px}
 .photo-thumb{aspect-ratio:1;overflow:hidden;border:1px solid var(--line);border-radius:4px;cursor:pointer;background:var(--panel)}
 .photo-thumb img{width:100%;height:100%;object-fit:cover}
-.photo-add-row{display:flex;gap:8px;margin-top:10px}
+.video-thumb{position:relative;aspect-ratio:1;overflow:hidden;border:1px solid var(--line);border-radius:4px;cursor:pointer;background:#000}
+.video-thumb img{width:100%;height:100%;object-fit:cover;opacity:.85}
+.play-badge{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.play-badge svg{width:28px;height:28px}
+.photo-add-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .editor-foot{display:flex;justify-content:space-between;align-items:center;margin:6px 0 18px;font-size:.75rem;color:var(--muted);font-style:italic}
 .entry-actions{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:16px}
-#file-cam,#file-lib,#import-file{display:none}
+#file-cam,#file-lib,#file-vid-cam,#file-vid-lib,#import-file{display:none}
 
 /* BUTTONS */
 .btn{background:var(--panel);border:1px solid var(--line);padding:9px 16px;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);border-radius:3px;display:inline-flex;align-items:center;gap:7px;transition:all .2s}
@@ -116,6 +120,8 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 .ec-snippet{font-size:.92rem;line-height:1.55;color:var(--ink);opacity:.85;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ec-photos{display:flex;gap:6px;margin-top:10px}
 .ec-photos img{width:52px;height:52px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+.ec-video-wrap{position:relative;display:inline-block}
+.ec-video-wrap svg{position:absolute;inset:0;margin:auto;width:16px;height:16px;color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
 .empty-note{text-align:center;color:var(--muted);font-style:italic;padding:48px 20px;line-height:1.7}
 
 /* CALENDAR */
@@ -217,6 +223,8 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
   </nav>
   <input type="file" id="file-cam" accept="image/*" capture="environment"/>
   <input type="file" id="file-lib" accept="image/*" multiple/>
+  <input type="file" id="file-vid-cam" accept="video/*" capture="environment"/>
+  <input type="file" id="file-vid-lib" accept="video/*" multiple/>
   <input type="file" id="import-file" accept="application/json"/>
 </div>
 
@@ -291,7 +299,7 @@ function getEntriesRaw(){return userData('entries',{});}
 function getEntry(k){const e=getEntriesRaw()[k];return (e&&!e.deleted)?e:null;}
 function putEntry(k,e){const all=getEntriesRaw();e.updated=Date.now();all[k]=e;saveData('entries',all);}
 function liveEntryKeys(){const all=getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
-function entryHasContent(e){if(!e)return false;if((e.photos||[]).length)return true;return Object.values(e.v||{}).some(v=>Array.isArray(v)?v.some(x=>String(x||'').trim()):String(v||'').trim());}
+function entryHasContent(e){if(!e)return false;if((e.photos||[]).length)return true;if((e.videos||[]).length)return true;return Object.values(e.v||{}).some(v=>Array.isArray(v)?v.some(x=>String(x||'').trim()):String(v||'').trim());}
 function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',defaultTemplate:'tgt',custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
 function saveSettings(patch){const s=Object.assign(settingsData(),patch);s.updated=Date.now();saveData('settings',s);applyAppearance();}
 function customTemplates(){return userData('templates',[]).filter(t=>!t.deleted);}
@@ -614,12 +622,16 @@ function renderToday(el){
   if(!isToday)h+=`<button class="today-jump" onclick="goToday()">back to today</button>`;
   h+=`<div class="tpl-row"><label>Template</label><select onchange="switchTpl(this.value)">${getTemplates().map(t=>`<option value="${t.id}" ${t.id===curEntry.t?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>`;
   h+=tpl.fields.map(renderField).join('');
-  h+=`<div class="field"><div class="field-label">Photos</div>
-    <div class="photo-strip" id="photo-strip">${(curEntry.photos||[]).map(p=>`<div class="photo-thumb" onclick="viewPhoto('${p.id}')"><img src="${p.img}" alt=""/></div>`).join('')}</div>
+  h+=`<div class="field"><div class="field-label">Photos & videos</div>
+    <div class="photo-strip" id="photo-strip">${(curEntry.photos||[]).map(p=>`<div class="photo-thumb" onclick="viewPhoto('${p.id}')"><img src="${p.img}" alt=""/></div>`).join('')}${(curEntry.videos||[]).map(v=>`<div class="video-thumb" onclick="viewVideo('${v.id}')"><img src="${v.thumb||''}" alt=""/><span class="play-badge"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span></div>`).join('')}</div>
     <div class="photo-add-row">
       <button class="btn small" onclick="document.getElementById('file-cam').click()"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
       <button class="btn small" onclick="document.getElementById('file-lib').click()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Add photos</button>
-    </div></div>`;
+      <button class="btn small" onclick="document.getElementById('file-vid-cam').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Record video</button>
+      <button class="btn small" onclick="document.getElementById('file-vid-lib').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Add video</button>
+    </div>
+    <div style="font-size:.7rem;color:var(--muted);font-style:italic;margin-top:8px">Videos stay stored on this device only — they are not included in sync or backups, but you can send them with Share below.</div>
+    </div>`;
   h+=`<div class="editor-foot"><span id="save-status"></span><span id="word-count">${wordLabel()}</span></div>`;
   h+=`<div class="entry-actions">
     <button class="btn" onclick="shareDay('${k}')"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>Share</button>
@@ -678,8 +690,10 @@ function goToday(){flushEntry();viewDate=dkey(new Date());showView('today');}
 function openDay(k){flushEntry();viewDate=k;showView('today');}
 function flushEntry(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;if(curEntry&&entryHasContent(curEntry))commitEntry();}}
 function deleteDay(k){
-  if(!confirm('Delete this whole entry, including its photos?'))return;
+  if(!confirm('Delete this whole entry, including its photos and videos?'))return;
+  const existing=getEntry(k);
   const all=getEntriesRaw();all[k]={deleted:true,updated:Date.now()};saveData('entries',all);
+  if(existing&&existing.videos)existing.videos.forEach(v=>{idbDeleteVideo(v.id).catch(()=>{});});
   curEntry=null;showView('today');
 }
 
@@ -687,6 +701,8 @@ function deleteDay(k){
 function setupFileInputs(){
   document.getElementById('file-cam').onchange=e=>{addPhotos(e.target.files);e.target.value='';};
   document.getElementById('file-lib').onchange=e=>{addPhotos(e.target.files);e.target.value='';};
+  document.getElementById('file-vid-cam').onchange=e=>{addVideos(e.target.files);e.target.value='';};
+  document.getElementById('file-vid-lib').onchange=e=>{addVideos(e.target.files);e.target.value='';};
   document.getElementById('import-file').onchange=e=>{importBackup(e.target.files[0]);e.target.value='';};
 }
 async function addPhotos(files){
@@ -725,6 +741,95 @@ function removePhoto(pid){
   commitEntry();closeModal();renderToday(document.getElementById('view'));
 }
 
+// ── VIDEOS (stored locally in IndexedDB — too large for the synced journal data) ──
+const VIDEO_DB_NAME='daybook_videos',VIDEO_STORE='videos',MAX_VIDEO_BYTES=300*1024*1024;
+function videoDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(VIDEO_DB_NAME,1);
+    req.onupgradeneeded=()=>{req.result.createObjectStore(VIDEO_STORE);};
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbPutVideo(id,blob){
+  const db=await videoDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(VIDEO_STORE,'readwrite');
+    tx.objectStore(VIDEO_STORE).put(blob,id);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function idbGetVideo(id){
+  const db=await videoDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(VIDEO_STORE,'readonly');
+    const req=tx.objectStore(VIDEO_STORE).get(id);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbDeleteVideo(id){
+  const db=await videoDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(VIDEO_STORE,'readwrite');
+    tx.objectStore(VIDEO_STORE).delete(id);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+function videoThumbnail(file){
+  return new Promise(resolve=>{
+    const url=URL.createObjectURL(file);
+    const v=document.createElement('video');
+    v.preload='metadata';v.muted=true;v.playsInline=true;
+    v.onloadedmetadata=()=>{try{v.currentTime=Math.min(.2,(v.duration||1)/4);}catch(e){URL.revokeObjectURL(url);resolve(null);}};
+    v.onseeked=()=>{
+      try{
+        const max=480;let w=v.videoWidth||320,h=v.videoHeight||180;
+        if(w>max||h>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(v,0,0,w,h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg',.7));
+      }catch(e){URL.revokeObjectURL(url);resolve(null);}
+    };
+    v.onerror=()=>{URL.revokeObjectURL(url);resolve(null);};
+    v.src=url;
+  });
+}
+async function addVideos(files){
+  if(!files||!files.length||currentView!=='today')return;
+  if(!window.indexedDB){alert('Video storage is not supported in this browser.');return;}
+  for(const f of Array.from(files)){
+    if(f.size>MAX_VIDEO_BYTES){alert(`"${f.name}" is over 300MB — too large to add.`);continue;}
+    try{
+      const thumb=await videoThumbnail(f);
+      const id=uid();
+      await idbPutVideo(id,f);
+      curEntry.videos=curEntry.videos||[];
+      curEntry.videos.push({id,thumb:thumb||'',mime:f.type||'video/mp4',size:f.size,name:f.name||'video'});
+    }catch(e){alert('Could not add that video: '+(e&&e.message?e.message:e));}
+  }
+  commitEntry();renderToday(document.getElementById('view'));
+}
+function viewVideo(vid){
+  const v=(curEntry.videos||[]).find(x=>x.id===vid);if(!v)return;
+  openModal(`<div class="video-full"><video controls autoplay playsinline id="video-player" style="width:100%;border-radius:4px;margin-bottom:14px;background:#000"></video></div>
+    <div class="set-row"><button class="btn danger" onclick="removeVideo('${vid}')">Remove video</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Video');
+  idbGetVideo(vid).then(blob=>{
+    if(!blob)return;
+    const url=URL.createObjectURL(blob);
+    const el=document.getElementById('video-player');
+    if(el){el.src=url;el.dataset.blobUrl=url;}else URL.revokeObjectURL(url);
+  }).catch(()=>{});
+}
+function removeVideo(vid){
+  curEntry.videos=(curEntry.videos||[]).filter(x=>x.id!==vid);
+  idbDeleteVideo(vid).catch(()=>{});
+  commitEntry();closeModal();renderToday(document.getElementById('view'));
+}
+
 // ── VOICE ──
 function toggleMic(btn){
   if(!SR){alert('Voice input is not supported in this browser.');return;}
@@ -759,7 +864,7 @@ function renderEntries(el){
     return `<div class="entry-card" onclick="openDay('${k}')">
       <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${m?m.e+' ':''}${esc(fmtFull(d))}</span><span class="ec-meta">${esc(templateById(e.t).name)}</span></div>
       ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
-      ${(e.photos||[]).length?`<div class="ec-photos">${e.photos.slice(0,5).map(p=>`<img src="${p.img}" alt=""/>`).join('')}</div>`:''}
+      ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.img}" alt=""/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt=""/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
     </div>`;}).join('');
   el.innerHTML=h;
 }
@@ -826,9 +931,13 @@ async function shareDay(k){
   if(!e){alert('Nothing written for this day yet.');return;}
   const text=dayText(k),title='Daybook — '+fmtLong(parseKey(k));
   try{
-    if(navigator.canShare&&(e.photos||[]).length){
-      const files=e.photos.map((p,i)=>new File([dataURLtoBlob(p.img)],`photo-${i+1}.jpg`,{type:'image/jpeg'}));
-      if(navigator.canShare({files,text})){await navigator.share({title,text,files});return;}
+    const hasMedia=((e.photos||[]).length||(e.videos||[]).length);
+    if(navigator.canShare&&hasMedia){
+      const files=(e.photos||[]).map((p,i)=>new File([dataURLtoBlob(p.img)],`photo-${i+1}.jpg`,{type:'image/jpeg'}));
+      for(const v of (e.videos||[])){
+        try{const blob=await idbGetVideo(v.id);if(blob)files.push(new File([blob],v.name||'video.mp4',{type:v.mime||'video/mp4'}));}catch(err){}
+      }
+      if(files.length&&navigator.canShare({files,text})){await navigator.share({title,text,files});return;}
     }
     if(navigator.share){await navigator.share({title,text});return;}
   }catch(err){if(err&&err.name==='AbortError')return;}
@@ -845,6 +954,9 @@ function entryHTML(k){
     if(String(v||'').trim())h+=`<h3>${esc(f.label)}</h3><p>${esc(v.trim()).replace(/\n/g,'<br/>')}</p>`;
   });
   if((e.photos||[]).length)h+=`<div class="ph">${e.photos.map(p=>`<img src="${p.img}"/>`).join('')}</div>`;
+  if((e.videos||[]).length){
+    h+=`<div class="ph">${e.videos.map(v=>`<img src="${v.thumb||''}"/>`).join('')}</div><p style="font-size:.75rem;color:#998;font-style:italic">Videos are not included in this export — use Share on the day to send the video files.</p>`;
+  }
   return h+'</article>';
 }
 function exportDoc(keys,title){
@@ -1009,6 +1121,7 @@ function renderSettings(el){
   <div class="set-block"><div class="set-label">Google Drive backup</div>${gdBlock}</div>
 
   <div class="set-block"><div class="set-label">Your data</div>
+    <div class="sync-status">Includes your written entries, templates, settings and photos. Videos live only on the device you added them on, so they are not included here or in sync/backup above.</div>
     <div class="set-row">
       <button class="btn" onclick="exportBackup()">Download full backup</button>
       <button class="btn" onclick="document.getElementById('import-file').click()">Import backup</button>
@@ -1087,7 +1200,11 @@ function openModal(body,title){
   document.getElementById('modal-root').innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
     <div class="modal-box"><div class="modal-head"><span class="modal-title" style="font-family:'Cormorant Garamond',serif">${esc(title||'')}</span><button class="modal-close" onclick="closeModal()">×</button></div>${body}</div></div>`;
 }
-function closeModal(){document.getElementById('modal-root').innerHTML='';}
+function closeModal(){
+  const vp=document.getElementById('video-player');
+  if(vp&&vp.dataset.blobUrl){try{URL.revokeObjectURL(vp.dataset.blobUrl);}catch(e){}}
+  document.getElementById('modal-root').innerHTML='';
+}
 </script>
 </body>
 </html>
