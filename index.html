@@ -340,7 +340,7 @@ function handleGoogleLogin(response){
   const p=parseJwt(response.credential);if(!p)return;
   localStorage.setItem('journal_sess',JSON.stringify({sub:p.sub,email:p.email||null,name:p.name||p.email||'You',exp:Date.now()+30*24*60*60*1000}));
   enterApp(p.sub,p.email||null,p.name||p.email||'You');
-  driveBoot();
+  driveBoot();bkDriveBoot();
 }
 function localSignIn(){
   localStorage.setItem('journal_sess',JSON.stringify({sub:'local',email:null,name:'You',exp:Date.now()+3650*24*60*60*1000}));
@@ -368,7 +368,7 @@ window.addEventListener('load',()=>{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
       enterApp(sess.sub,sess.email||null,sess.name||'You');
-      if(sess.sub!=='local')driveBoot();
+      if(sess.sub!=='local'){driveBoot();bkDriveBoot();}
       return;
     }
   }catch(e){}
@@ -490,9 +490,10 @@ const BACKUP_FILENAME='daybook-backup.json';
 function getBkToken(){try{const t=JSON.parse(localStorage.getItem('journal_bkdrive_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
 function hasBkToken(){return !!getBkToken();}
 function bkTokenInvalid(){localStorage.removeItem('journal_bkdrive_tok');}
-function bkDriveAuthRedirect(){
-  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:BACKUP_DRIVE_SCOPE,state:'daybook_bkdrive',include_granted_scopes:'true',prompt:'consent'});
+function bkDriveAuthRedirect(interactive){
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:BACKUP_DRIVE_SCOPE,state:'daybook_bkdrive',include_granted_scopes:'true'});
   if(currentUserEmail)p.set('login_hint',currentUserEmail);
+  p.set('prompt',interactive?'consent':'none');
   location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
 }
 function checkBkDriveRedirect(){
@@ -500,16 +501,28 @@ function checkBkDriveRedirect(){
   const h=new URLSearchParams(location.hash.slice(1));
   if(h.get('state')!=='daybook_bkdrive')return;
   const err=h.get('error');
-  if(err){alert('Google Drive connection failed: '+err);}
+  if(err){sessionStorage.setItem('journal_bkdrive_err',err);}
   else if(h.get('access_token')){
     const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
     localStorage.setItem('journal_bkdrive_tok',JSON.stringify({tok:h.get('access_token'),exp}));
+    sessionStorage.removeItem('journal_bkdrive_err');sessionStorage.removeItem('journal_bkdrive_tried');
   }
   history.replaceState(null,'',location.pathname+location.search);
+}
+function bkDriveBoot(){
+  if(getBkToken()){
+    localStorage.setItem(`journal_bkdrive_on_${currentUser}`,'1');
+    return;
+  }
+  if(localStorage.getItem(`journal_bkdrive_on_${currentUser}`)&&!sessionStorage.getItem('journal_bkdrive_tried')){
+    sessionStorage.setItem('journal_bkdrive_tried','1');
+    bkDriveAuthRedirect(false);
+  }
 }
 function bkDisconnect(){
   if(!confirm('Disconnect Google Drive backup? The folder you already backed up to keeps its file, but it will stop updating.'))return;
   bkTokenInvalid();
+  localStorage.removeItem(`journal_bkdrive_on_${currentUser}`);
   const s=settingsData();
   saveSettings({gdriveBackup:Object.assign({},s.gdriveBackup,{enabled:false,folderId:null,folderName:null})});
   showView('settings');
@@ -517,6 +530,7 @@ function bkDisconnect(){
 async function bkFetch(url,opts){
   const res=await fetch(url,opts);
   if(res.status===401){bkTokenInvalid();throw new Error('Google sign-in expired — reconnect in Settings.');}
+  if(res.status===403){let msg='';try{const j=await res.json();msg=(j.error&&j.error.message)||'';}catch(e){}throw new Error(msg||'Google Drive refused the request (403).');}
   if(!res.ok)throw new Error('Drive error '+res.status);
   return res;
 }
@@ -1057,10 +1071,14 @@ function renderSettings(el){
   }
   const gd=s.gdriveBackup||{};
   const bkConnected=hasBkToken();
+  const bkErr=sessionStorage.getItem('journal_bkdrive_err')||lastBkBackupError;
   let gdBlock;
   if(!bkConnected){
-    gdBlock=`<div class="sync-status">Keep a visible backup file in a Google Drive folder you choose — separate from the automatic sync above. Connecting asks for a broader Google Drive permission, so you may see an "unverified app" notice; that's expected for this project and safe to continue through.</div>
-      <div class="set-row"><button class="btn primary" onclick="bkDriveAuthRedirect()">Connect Google Drive backup</button></div>`;
+    gdBlock=`<div class="sync-status">Keep a visible backup file in a Google Drive folder you choose — separate from the automatic sync above. Connecting asks for a broader Google Drive permission, so you may see an "unverified app" notice; that's expected for this project and safe to continue through.
+      ${gd.folderId?`<br/>Was backing up to <b>${esc(gd.folderName||'Google Drive')}</b> — reconnect to resume.`:''}
+      ${bkErr?`<br/><span class="err">${esc(bkErr)}</span>`:''}
+    </div>
+      <div class="set-row"><button class="btn primary" onclick="bkDriveAuthRedirect(true)">${gd.folderId?'Reconnect':'Connect'} Google Drive backup</button>${gd.folderId?`<button class="btn danger" onclick="bkDisconnect()">Disconnect</button>`:''}</div>`;
   }else if(!gd.folderId){
     gdBlock=`<div class="sync-status">Connected. Choose a folder in your Google Drive to back up into.</div>
       <div class="set-row"><button class="btn primary" onclick="openBkFolderPicker()">Choose folder</button><button class="btn danger" onclick="bkDisconnect()">Disconnect</button></div>`;
