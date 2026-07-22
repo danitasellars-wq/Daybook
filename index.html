@@ -340,7 +340,7 @@ function handleGoogleLogin(response){
   const p=parseJwt(response.credential);if(!p)return;
   localStorage.setItem('journal_sess',JSON.stringify({sub:p.sub,email:p.email||null,name:p.name||p.email||'You',exp:Date.now()+30*24*60*60*1000}));
   enterApp(p.sub,p.email||null,p.name||p.email||'You');
-  driveBoot();bkDriveBoot();
+  if(!driveBoot())bkDriveBoot();
 }
 function localSignIn(){
   localStorage.setItem('journal_sess',JSON.stringify({sub:'local',email:null,name:'You',exp:Date.now()+3650*24*60*60*1000}));
@@ -370,7 +370,7 @@ window.addEventListener('load',()=>{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
       enterApp(sess.sub,sess.email||null,sess.name||'You');
-      if(sess.sub!=='local'){driveBoot();bkDriveBoot();}
+      if(sess.sub!=='local'){if(!driveBoot())bkDriveBoot();}
       return;
     }
   }catch(e){}
@@ -399,17 +399,21 @@ function driveAuthRedirect(interactive){
   if(!interactive)p.set('prompt','none');
   location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
 }
+// Returns true if it navigated away to silently reconnect (so callers must not
+// start another redirect this tick — a second location.href would clobber this one).
 function driveBoot(){
   driveAccessToken=getDriveToken();
   if(driveAccessToken){
     localStorage.setItem(`journal_drive_on_${currentUser}`,'1');
     driveSyncNow(false);
-    return;
+    return false;
   }
   if(localStorage.getItem(`journal_drive_on_${currentUser}`)&&!sessionStorage.getItem('journal_drive_tried')){
     sessionStorage.setItem('journal_drive_tried','1');
     driveAuthRedirect(false);
+    return true;
   }
+  return false;
 }
 function driveTokenInvalid(){localStorage.removeItem('journal_drive_tok');driveAccessToken=null;}
 function enableDriveSync(){sessionStorage.removeItem('journal_drive_err');lastSyncError=null;driveAuthRedirect(true);}
@@ -939,24 +943,53 @@ function removeVideo(vid){
 }
 
 // ── VOICE ──
+let micActive=false,micStopReq=false,micLastStart=0;
 function toggleMic(btn){
-  if(!SR){alert('Voice input is not supported in this browser.');return;}
-  if(rec){const same=btn===recBtn;stopMic();if(same)return;}
+  if(!SR){alert('Voice typing isn’t available in this browser. Try Chrome, or use the microphone key on your on-screen keyboard.');return;}
+  if(rec){const same=(btn===recBtn);stopMicManual();if(same)return;}
   const wrap=btn.closest('.vfield');const el=wrap&&wrap.querySelector('input,textarea');if(!el)return;
-  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang=navigator.language||'en-GB';
   recEl=el;recBtn=btn;recBase=el.value?el.value.replace(/\s+$/,'')+' ':'';
+  micActive=true;micStopReq=false;
   btn.classList.add('rec');
-  rec.onresult=ev=>{
-    let fin='',inter='';
-    for(let i=0;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fin+=r[0].transcript;else inter+=r[0].transcript;}
-    recEl.value=recBase+fin+inter;
-    onField(recEl);
-  };
-  rec.onerror=e=>{if(e.error==='not-allowed')alert('Microphone access was blocked. Allow the microphone for this site in your browser settings.');};
-  rec.onend=()=>{if(recBtn)recBtn.classList.remove('rec');rec=null;recEl=null;recBtn=null;};
-  try{rec.start();}catch(e){}
+  micStart();
 }
-function stopMic(){if(rec){try{rec.stop();}catch(e){}}}
+function micStart(){
+  try{rec=new SR();}catch(e){return micFail('Voice typing could not start on this device.');}
+  rec.continuous=true;rec.interimResults=true;rec.lang=navigator.language||'en-GB';
+  rec.onresult=ev=>{
+    let inter='';
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      const r=ev.results[i];
+      if(r.isFinal)recBase=recBase.replace(/\s+$/,'')+(recBase.trim()?' ':'')+r[0].transcript.trim()+' ';
+      else inter+=r[0].transcript;
+    }
+    if(recEl){recEl.value=recBase+inter;onField(recEl);}
+  };
+  rec.onerror=ev=>{
+    const x=ev.error;
+    if(x==='no-speech'||x==='aborted')return; // benign — onend decides whether to keep going
+    micActive=false;
+    if(x==='not-allowed'||x==='service-not-allowed')micFail('Microphone access is blocked. Open this app’s site settings in your browser, turn the Microphone on, then tap the mic again.');
+    else if(x==='audio-capture')micFail('No microphone was found on this device.');
+    else if(x==='network')micFail('Voice typing needs an internet connection and couldn’t reach the service. Check your connection and try again.');
+    else if(x==='language-not-supported')micFail('Voice typing isn’t available for this language on your device.');
+    else micFail('Voice typing stopped unexpectedly ('+x+'). Please try again.');
+  };
+  rec.onend=()=>{
+    if(!micActive||micStopReq){micFinish();return;}
+    // Mobile Chrome ends recognition after each pause — restart to keep dictating,
+    // but if it ends almost instantly the service is failing, so stop instead of looping.
+    if(Date.now()-micLastStart<700){micFinish();return;}
+    micLastStart=Date.now();
+    try{rec.start();}catch(e){micFinish();}
+  };
+  micLastStart=Date.now();
+  try{rec.start();}catch(e){micFail('Voice typing could not start. Please try again.');}
+}
+function stopMicManual(){micStopReq=true;micActive=false;if(rec){try{rec.stop();}catch(e){}}micFinish();}
+function stopMic(){if(rec||micActive)stopMicManual();}
+function micFinish(){if(recBtn)recBtn.classList.remove('rec');rec=null;recBtn=null;recEl=null;micActive=false;}
+function micFail(msg){micFinish();alert(msg);}
 
 // ── ENTRIES (timeline) ──
 function renderEntries(el){
