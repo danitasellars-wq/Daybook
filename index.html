@@ -190,6 +190,25 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 .tb-field-bottom select{border:1px solid var(--line);background:var(--bg);padding:4px 6px;font-size:.78rem;border-radius:3px}
 .tb-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
 @media print{#bottom-nav,header,body::after{display:none!important}}
+
+/* STARS / REWARDS */
+.stars-fab{position:fixed;right:18px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:260;width:54px;height:54px;border-radius:50%;background:var(--ink);border:none;color:#d9a848;font-size:1.5rem;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.22);transition:transform .2s}
+.stars-fab:active{transform:scale(.94)}
+.stars-balance-card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:20px 20px 22px;margin-bottom:22px}
+.stars-balance-head{display:flex;align-items:center;gap:7px;font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
+.stars-info-btn{background:none;color:var(--muted);width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--muted);border-radius:50%;font-size:.6rem;font-style:italic;line-height:1}
+.stars-info-btn:hover{color:var(--ink);border-color:var(--ink)}
+.stars-balance-num{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:700;color:var(--ink);display:flex;align-items:baseline;gap:8px;margin-bottom:18px}
+.stars-balance-num .star{color:#c99a2e;font-size:.55em}
+.stars-slider-track{position:relative;height:8px;background:var(--bg);border:1px solid var(--line);border-radius:4px;margin:0 8px 8px}
+.stars-slider-fill{position:absolute;left:0;top:0;bottom:0;background:#c99a2e;border-radius:4px;transition:width .5s}
+.stars-slider-dot{position:absolute;top:50%;width:16px;height:16px;background:var(--panel);border:3px solid #c99a2e;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.stars-slider-mark{position:absolute;top:50%;width:24px;height:24px;background:var(--panel);border:2px solid var(--ink);border-radius:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.18);z-index:2}
+.stars-slider-ticks{display:flex;justify-content:space-between;font-size:.62rem;color:var(--muted);letter-spacing:.05em;margin:0 0 18px}
+.stars-tab-row{display:flex;gap:8px;margin-bottom:16px}
+.stars-tab{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:9px 6px;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);transition:all .2s}
+.stars-tab.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
+.stars-item-value{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#c99a2e;white-space:nowrap;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -268,6 +287,10 @@ const BUILTINS=[
     {id:'w',type:'long',label:'What is on your mind?'}]}
 ];
 const MIC_SVG='<svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>';
+// Beta feature — no backend exists to store a global permissions list, so access is
+// gated by this hardcoded allowlist of the Google account email from sign-in. To
+// grant/revoke someone, edit this array and push (ask Claude to do it anytime).
+const STARS_BETA_EMAILS=['danita@howleruk.com'];
 
 // ── STATE ──
 let currentUser=null,currentUserEmail=null,currentUserName='';
@@ -300,8 +323,8 @@ function getEntry(k){const e=getEntriesRaw()[k];return (e&&!e.deleted)?e:null;}
 function putEntry(k,e){const all=getEntriesRaw();e.updated=Date.now();all[k]=e;saveData('entries',all);}
 function liveEntryKeys(){const all=getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
 function entryHasContent(e){if(!e)return false;if((e.photos||[]).length)return true;if((e.videos||[]).length)return true;return Object.values(e.v||{}).some(v=>Array.isArray(v)?v.some(x=>String(x||'').trim()):String(v||'').trim());}
-function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',defaultTemplate:'tgt',custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
-function saveSettings(patch){const s=Object.assign(settingsData(),patch);s.updated=Date.now();saveData('settings',s);applyAppearance();}
+function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',defaultTemplate:'tgt',reminders:[],custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
+function saveSettings(patch){const s=Object.assign(settingsData(),patch);s.updated=Date.now();saveData('settings',s);applyAppearance();mirrorReminders(s);}
 function customTemplates(){return userData('templates',[]).filter(t=>!t.deleted);}
 function getTemplates(){return BUILTINS.concat(customTemplates());}
 function templateById(id){return getTemplates().find(t=>t.id===id)||BUILTINS[0];}
@@ -357,6 +380,10 @@ function enterApp(sub,email,name){
   showView('today');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   migrateInlinePhotos().then(changed=>{if(changed){curEntry=null;showView(currentView);}}).catch(()=>{});
+  setupReminderSW();
+  mirrorReminders(settingsData());
+  setInterval(checkDueRemindersForeground,60000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDueRemindersForeground();});
 }
 function signOut(){
   if(!confirm('Sign out? Your journal stays saved on this device and in your Google Drive.'))return;
@@ -467,19 +494,21 @@ async function pullAndMerge(){
   const mT=Object.values(byId).sort((a,b)=>(a.created||0)-(b.created||0));
   const lS=userData('settings',{}),rS=p.settings||{};
   const mS=((lS.updated||0)>=(rS.updated||0))?lS:rS;
-  const mStr=JSON.stringify({e:mE,t:mT,s:mS});
-  const localChanged=mStr!==JSON.stringify({e:lE,t:lT,s:lS});
-  const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS});
+  const lSt=userData('stars',{}),rSt=p.stars||{};
+  const mSt=((lSt.updated||0)>=(rSt.updated||0))?lSt:rSt;
+  const mStr=JSON.stringify({e:mE,t:mT,s:mS,st:mSt});
+  const localChanged=mStr!==JSON.stringify({e:lE,t:lT,s:lS,st:lSt});
+  const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS,st:rSt});
   if(localChanged){
-    setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);
-    applyAppearance();curEntry=null;showView(currentView);
+    setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);setStore(userKey('stars'),mSt);
+    applyAppearance();mirrorReminders(mS);curEntry=null;showView(currentView);
   }
   const migrated=await migrateInlinePhotos();
   return (pushNeeded||migrated)?'pushneeded':'insync';
 }
 async function pushToDrive(){
   if(!driveAccessToken||!currentUser)return;
-  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),at:Date.now()});
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),at:Date.now()});
   if(driveFileId){
     await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+driveAccessToken,'Content-Type':'application/json'},body});
   }else{
@@ -660,7 +689,7 @@ async function bkBackupNow(manual){
   if(!gd.enabled||!gd.folderId)return;
   const token=getBkToken();
   if(!token){if(manual)alert('Reconnect Google Drive backup in Settings.');return;}
-  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),exported:Date.now()});
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),exported:Date.now()});
   try{
     const auth={headers:{Authorization:'Bearer '+token}};
     const q=encodeURIComponent(`'${gd.folderId}' in parents and name='${BACKUP_FILENAME}' and trashed=false`);
@@ -688,6 +717,109 @@ function scheduleBkBackup(){
   bkBackupTimer=setTimeout(()=>bkBackupNow(false),4000);
 }
 
+// ── REMINDERS (best-effort local notifications, no backend) ──
+// The service worker can't read localStorage, so reminder config is mirrored into
+// a small IndexedDB it can open itself; 'lastFired' lives there too so both the
+// foreground check (page open) and the periodicsync check (page closed) agree on
+// what's already fired today, however either one runs.
+const REMINDER_DB='daybook_reminders',REMINDER_STORE='kv';
+function remDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(REMINDER_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(REMINDER_STORE))req.result.createObjectStore(REMINDER_STORE);};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
+async function remGet(key){const db=await remDB();return new Promise((resolve,reject)=>{const tx=db.transaction(REMINDER_STORE,'readonly');const rq=tx.objectStore(REMINDER_STORE).get(key);rq.onsuccess=()=>resolve(rq.result);rq.onerror=()=>reject(rq.error);});}
+async function remSet(key,val){const db=await remDB();return new Promise((resolve,reject)=>{const tx=db.transaction(REMINDER_STORE,'readwrite');tx.objectStore(REMINDER_STORE).put(val,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
+async function mirrorReminders(s){
+  try{
+    const cur=(await remGet('state'))||{reminders:[],lastFired:{}};
+    cur.reminders=(s.reminders||[]).map(r=>({id:r.id,label:r.label,time:r.time,days:r.days,enabled:r.enabled}));
+    await remSet('state',cur);
+    checkDueRemindersForeground();
+  }catch(e){}
+}
+async function setupReminderSW(){
+  if(!('serviceWorker' in navigator))return;
+  try{
+    const reg=await navigator.serviceWorker.register('sw.js');
+    if(reg.periodicSync&&navigator.permissions){
+      try{
+        const status=await navigator.permissions.query({name:'periodic-background-sync'});
+        if(status.state==='granted')await reg.periodicSync.register('daybook-reminder-check',{minInterval:15*60*1000});
+      }catch(e){}
+    }
+  }catch(e){}
+}
+async function checkDueRemindersForeground(){
+  if(!('serviceWorker' in navigator)||!('Notification' in window)||Notification.permission!=='granted')return;
+  try{
+    const reg=await navigator.serviceWorker.getRegistration();
+    if(!reg)return;
+    const state=(await remGet('state'))||{reminders:[],lastFired:{}};
+    const reminders=state.reminders||[];
+    if(!reminders.length)return;
+    const now=new Date(),dk=dkey(now),mins=now.getHours()*60+now.getMinutes();
+    let changed=false;
+    for(const r of reminders){
+      if(!r.enabled)continue;
+      if(!(r.days||[]).includes(now.getDay()))continue;
+      const parts=(r.time||'20:00').split(':').map(Number);
+      if(mins<parts[0]*60+parts[1])continue;
+      if(state.lastFired[r.id]===dk)continue;
+      await reg.showNotification('Daybook',{body:r.label||'Time to write in your journal.',icon:'icon.svg',tag:'daybook-reminder-'+r.id});
+      state.lastFired[r.id]=dk;changed=true;
+    }
+    if(changed)await remSet('state',state);
+  }catch(e){}
+}
+async function requestNotifPermission(){
+  if(!('Notification' in window)){alert('Notifications are not supported in this browser.');return;}
+  await Notification.requestPermission();
+  showView('settings');
+  checkDueRemindersForeground();
+}
+let editingReminder=null;
+function editReminder(id){
+  const s=settingsData();
+  if(id){const r=(s.reminders||[]).find(x=>x.id===id);if(!r)return;editingReminder=JSON.parse(JSON.stringify(r));}
+  else editingReminder={id:'r'+uid(),label:'',time:'20:30',days:[0,1,2,3,4,5,6],enabled:true};
+  renderReminderModal();
+}
+function renderReminderModal(){
+  const r=editingReminder;
+  const DOW=[['M',1],['T',2],['W',3],['T',4],['F',5],['S',6],['S',0]];
+  const body=`<div class="tb-name"><input placeholder="Reminder name (e.g. Evening reflection)" value="${esc(r.label)}" oninput="editingReminder.label=this.value"/></div>
+  <div class="field"><div class="field-label">Time</div><div class="vfield"><input type="time" value="${esc(r.time)}" oninput="editingReminder.time=this.value"/></div></div>
+  <div class="field"><div class="field-label">Repeats on</div><div class="mood-row">${DOW.map(([lbl,v])=>`<button class="mood-opt ${r.days.includes(v)?'on':''}" onclick="toggleReminderDay(${v})" type="button"><span class="m-label">${lbl}</span></button>`).join('')}</div></div>
+  <div class="tb-actions">
+    <button class="btn primary" onclick="saveReminder()">Save reminder</button>
+    <button class="btn" onclick="closeModal()">Cancel</button>
+  </div>`;
+  openModal(body,r.label?'Edit reminder':'New reminder');
+}
+function toggleReminderDay(v){
+  const d=editingReminder.days;const i=d.indexOf(v);
+  if(i>=0)d.splice(i,1);else d.push(v);
+  renderReminderModal();
+}
+function saveReminder(){
+  const r=editingReminder;
+  r.label=(r.label||'').trim()||'Journal reminder';
+  if(!r.days.length){alert('Choose at least one day.');return;}
+  const s=settingsData();
+  const all=(s.reminders||[]).slice();
+  const idx=all.findIndex(x=>x.id===r.id);
+  if(idx>=0)all[idx]=r;else all.push(r);
+  saveSettings({reminders:all});
+  editingReminder=null;closeModal();showView('settings');
+  if(('Notification' in window)&&Notification.permission==='default')requestNotifPermission();
+}
+function toggleReminder(id){
+  const s=settingsData();const all=(s.reminders||[]).map(r=>r.id===id?Object.assign({},r,{enabled:!r.enabled}):r);
+  saveSettings({reminders:all});showView('settings');
+}
+function deleteReminder(id){
+  if(!confirm('Delete this reminder?'))return;
+  const s=settingsData();const all=(s.reminders||[]).filter(r=>r.id!==id);
+  saveSettings({reminders:all});showView('settings');
+}
+
 // ── NAV ──
 function showView(v){
   currentView=v;
@@ -697,6 +829,7 @@ function showView(v){
   if(v==='today')renderToday(el);
   else if(v==='entries')renderEntries(el);
   else if(v==='calendar')renderCalendar(el);
+  else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
   window.scrollTo(0,0);
 }
@@ -732,6 +865,7 @@ function renderToday(el){
     <button class="btn" onclick="downloadDay('${k}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export day</button>
     ${stored?`<button class="btn danger" onclick="deleteDay('${k}')">Delete entry</button>`:''}
   </div>`;
+  if(starsAllowed())h+=`<button class="stars-fab" onclick="showView('rewards')" title="Rewards">★</button>`;
   el.innerHTML=h;
   requestAnimationFrame(()=>el.querySelectorAll('textarea').forEach(autogrow));
 }
@@ -1052,6 +1186,149 @@ function renderCalendar(el){
 }
 function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCalendar(document.getElementById('view'));}
 
+// ── STARS / REWARDS (beta — visible only to emails in STARS_BETA_EMAILS above) ──
+function starsAllowed(){return !!currentUserEmail&&STARS_BETA_EMAILS.map(x=>x.toLowerCase()).includes(String(currentUserEmail).toLowerCase());}
+function starsData(){return Object.assign({balance:0,log:[],earnActivities:[],spendRewards:[]},userData('stars',{}));}
+function saveStars(patch){const s=Object.assign(starsData(),patch);s.updated=Date.now();saveData('stars',s);}
+// Auto-scaling slider max: rounds up to a "nice" number a bit above the current balance.
+function starsMax(bal){
+  if(bal<100)return 100;
+  const mag=Math.pow(10,Math.floor(Math.log10(bal)));
+  return Math.ceil((bal*1.2)/mag)*mag;
+}
+function fmtStars(n){return n>=1000?(Math.round(n/100)/10)+'k':String(n);}
+function starsTimeAgo(ts){
+  if(!ts)return'';
+  const diff=Date.now()-ts,mins=Math.floor(diff/60000);
+  if(mins<2)return'Just now';
+  if(mins<60)return`${mins}m ago`;
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return`${hrs}h ago`;
+  const days=Math.floor(hrs/24);
+  if(days<7)return`${days} day${days!==1?'s':''} ago`;
+  return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+let rewardsTab='earn',rewardsSearch='';
+// Re-renders in place without the showView()'s scroll-to-top/nav-state reset — used for
+// every in-page refresh (search, tab switch, earn/redeem/save/delete) so typing in the
+// search box (or tapping a tab) doesn't yank the page back to the top each keystroke.
+function refreshRewards(){renderRewards(document.getElementById('view'));}
+// One-time seed of Danita's own earn/spend lists — only fills in if 'stars' has never been saved.
+function ensureStarsSeeded(){
+  if(userData('stars',null))return;
+  const mk=(label,stars)=>({id:uid(),label,stars});
+  const earnPairs=[
+    ['5 Hanging leg lifts',1],['500 steps',1],['3 Zone minutes',1],['30 second plank',1],['10 Bear raises',1],['20 Leg splits',1],['5 Kettle bells',1],['3 pressups',1],['5 ceiling touches',1],
+    ['1000 steps',5],['10 zone minutes',5],['10 hanging leg lifts',5],['1 minute plank',5],['15 Kettle bells',5],['Out of bed before 6am',5],['10/10/10',5],['10 pressups',5],
+    ['2000 steps',10],['25 Kettle bells',10],['15 ceiling touches',10],
+    ['20 minute weight building',25],['45 minute sport',25],['45 zone minute session',25],['5000 steps',25],['20 minutes ironing',25],['Make 1 meal',25]
+  ];
+  saveStars({balance:0,log:[],earnActivities:earnPairs.map(([l,st])=>mk(l,st)),spendRewards:[mk('Little reward',25),mk('Big reward',100)]});
+}
+// Builds just the item-row list for the active tab, filtered by the current search text.
+// Kept separate from renderRewards() so search typing can replace only this list —
+// replacing the whole view (including the <input> itself) on every keystroke would
+// destroy and recreate the input node, so it loses focus after the very first letter.
+function starsRowsHtml(){
+  const s=starsData();
+  const list=rewardsTab==='earn'?s.earnActivities:s.spendRewards;
+  const q=rewardsSearch.trim().toLowerCase();
+  const shown=q?list.filter(x=>x.label.toLowerCase().includes(q)):list;
+  return shown.length?shown.map(x=>`<div class="tpl-list-item">
+      <span class="tli-name">${esc(x.label)}</span>
+      <span class="tli-actions">
+        <span class="stars-item-value">${x.stars} ★</span>
+        <button class="btn small" onclick="${rewardsTab==='earn'?`earnStars('${x.id}')`:`redeemReward('${x.id}')`}">${rewardsTab==='earn'?'Earn':'Redeem'}</button>
+        <button class="icon-btn" title="Edit" onclick="openAddStarsItem('${rewardsTab}','${x.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="icon-btn" title="Delete" onclick="deleteStarsItem('${rewardsTab}','${x.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </span></div>`).join(''):`<div class="empty-note">${q?'Nothing found.':(rewardsTab==='earn'?'No ways to earn yet — add your first!':'No rewards yet — add something worth saving up for.')}</div>`;
+}
+function onStarsSearchInput(inputEl){
+  rewardsSearch=inputEl.value;
+  const list=document.getElementById('stars-items');
+  if(list)list.innerHTML=starsRowsHtml();
+}
+function renderRewards(el){
+  if(!starsAllowed()){showView('today');return;}
+  ensureStarsSeeded();
+  const s=starsData();
+  const max=starsMax(s.balance);
+  const pct=Math.min(100,(s.balance/max)*100);
+  const bigMarkPct=Math.min(100,(100/max)*100);
+  const ticks=[0,.25,.5,.75,1].map(f=>fmtStars(Math.round(max*f)));
+  const log=(s.log||[]).slice().sort((a,b)=>b.at-a.at).slice(0,8);
+  const logHtml=log.map(l=>`<div class="tpl-list-item"><span class="tli-name">${esc(l.label)}<span class="tli-tag">${starsTimeAgo(l.at)}</span></span><span class="stars-item-value" style="color:${l.type==='earn'?'#2a7a4a':'var(--accent)'}">${l.type==='earn'?'+':'−'}${l.stars} ★</span></div>`).join('');
+  el.innerHTML=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Rewards</div><div class="section-sub">Earn stars, then spend them on the things you love.</div></div></div>
+    <div class="stars-balance-card">
+      <div class="stars-balance-head">Star Balance <button class="stars-info-btn" onclick="openStarsInfo()">i</button></div>
+      <div class="stars-balance-num">${s.balance}<span class="star">★</span></div>
+      <div class="stars-slider-track"><div class="stars-slider-fill" style="width:${pct}%"></div><div class="stars-slider-mark" style="left:${bigMarkPct}%" title="Big reward: 100 ★">100</div><div class="stars-slider-dot" style="left:${pct}%"></div></div>
+      <div class="stars-slider-ticks">${ticks.map(t=>`<span>${t}</span>`).join('')}</div>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="rewardsTab='spend';rewardsSearch='';refreshRewards()">Spend your Stars</button>
+    </div>
+    <div class="stars-tab-row">
+      <button class="stars-tab ${rewardsTab==='earn'?'on':''}" onclick="rewardsTab='earn';rewardsSearch='';refreshRewards()">Ways to Earn</button>
+      <button class="stars-tab ${rewardsTab==='spend'?'on':''}" onclick="rewardsTab='spend';rewardsSearch='';refreshRewards()">Ways to Spend</button>
+    </div>
+    <div class="search-wrap"><input placeholder="Search ${rewardsTab==='earn'?'ways to earn':'rewards to spend on'}…" value="${esc(rewardsSearch)}" oninput="onStarsSearchInput(this)"/></div>
+    <div id="stars-items">${starsRowsHtml()}</div>
+    <div style="margin-top:14px"><button class="btn" onclick="openAddStarsItem('${rewardsTab}')">+ Add a way to ${rewardsTab==='earn'?'earn':'spend'} stars</button></div>
+    ${log.length?`<div class="set-block" style="margin-top:24px"><div class="set-label">Recent activity</div>${logHtml}</div>`:''}`;
+}
+function openStarsInfo(){
+  openModal(`<p style="font-size:.92rem;line-height:1.6">Earn stars for the things you agree are worth rewarding, then spend them on treats you both add to the list. It's just a running total — earn as many as you like, spend whenever you like.</p>
+    <div class="tb-actions"><button class="btn" onclick="closeModal()">Close</button></div>`,'How stars work');
+}
+function earnStars(id){
+  const s=starsData();
+  const a=s.earnActivities.find(x=>x.id===id);if(!a)return;
+  s.balance=(s.balance||0)+a.stars;
+  s.log=(s.log||[]).concat([{id:uid(),type:'earn',label:a.label,stars:a.stars,at:Date.now()}]);
+  saveStars(s);refreshRewards();
+}
+function redeemReward(id){
+  const s=starsData();
+  const r=s.spendRewards.find(x=>x.id===id);if(!r)return;
+  if((s.balance||0)<r.stars){alert(`You need ${r.stars} ★ for this — you have ${s.balance} ★.`);return;}
+  if(!confirm(`Redeem "${r.label}" for ${r.stars} ★?`))return;
+  s.balance=s.balance-r.stars;
+  s.log=(s.log||[]).concat([{id:uid(),type:'spend',label:r.label,stars:r.stars,at:Date.now()}]);
+  saveStars(s);refreshRewards();
+}
+function openAddStarsItem(kind,editId){
+  const s=starsData();
+  const arr=kind==='earn'?s.earnActivities:s.spendRewards;
+  const existing=editId?arr.find(x=>x.id===editId):null;
+  const body=`<div class="tb-name"><input id="si-label" placeholder="${kind==='earn'?'e.g. Went for a run':'e.g. Takeaway night'}" value="${existing?esc(existing.label):''}"/></div>
+    <div class="field"><div class="field-label">Stars ${kind==='earn'?'earned':'cost'}</div><div class="vfield"><input id="si-stars" type="number" min="1" step="1" placeholder="e.g. 10" value="${existing?existing.stars:''}"/></div></div>
+    <div class="tb-actions">
+      <button class="btn primary" onclick="saveStarsItem('${kind}','${existing?existing.id:''}')">Save</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(body,(existing?'Edit':'Add')+' way to '+(kind==='earn'?'earn':'spend'));
+  setTimeout(()=>{const elx=document.getElementById('si-label');if(elx)elx.focus();},50);
+}
+function saveStarsItem(kind,id){
+  const label=(document.getElementById('si-label').value||'').trim();
+  const stars=Math.max(1,Math.round(Number(document.getElementById('si-stars').value)||0));
+  if(!label||!stars){alert('Add a name and a star value of at least 1.');return;}
+  const s=starsData();
+  const arrKey=kind==='earn'?'earnActivities':'spendRewards';
+  const arr=s[arrKey].slice();
+  const idx=id?arr.findIndex(x=>x.id===id):-1;
+  if(idx>=0)arr[idx]=Object.assign({},arr[idx],{label,stars});
+  else arr.push({id:uid(),label,stars});
+  s[arrKey]=arr;
+  saveStars(s);closeModal();rewardsTab=kind;refreshRewards();
+}
+function deleteStarsItem(kind,id){
+  if(!confirm('Remove this from the list?'))return;
+  const s=starsData();
+  const arrKey=kind==='earn'?'earnActivities':'spendRewards';
+  s[arrKey]=s[arrKey].filter(x=>x.id!==id);
+  saveStars(s);refreshRewards();
+}
+
 // ── EXPORT / SHARE ──
 function dayText(k){
   const e=getEntry(k);if(!e)return '';
@@ -1166,7 +1443,7 @@ async function shareMonth(y,m){
 
 // ── BACKUP ──
 function exportBackup(){
-  download(`daybook-backup-${dkey(new Date())}.json`,JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),exported:Date.now()}),'application/json');
+  download(`daybook-backup-${dkey(new Date())}.json`,JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),exported:Date.now()}),'application/json');
 }
 function importBackup(file){
   if(!file)return;
@@ -1237,6 +1514,27 @@ function renderSettings(el){
       <button class="btn danger" onclick="bkDisconnect()">Disconnect</button>
     </div>`;
   }
+  const permOk=('Notification' in window)&&Notification.permission==='granted';
+  const permDenied=('Notification' in window)&&Notification.permission==='denied';
+  const DOWLBL=[['Mon',1],['Tue',2],['Wed',3],['Thu',4],['Fri',5],['Sat',6],['Sun',0]];
+  const reminders=s.reminders||[];
+  const remRows=reminders.map(r=>{
+    const daysLabel=(r.days||[]).length===7?'Every day':DOWLBL.filter(d=>(r.days||[]).includes(d[1])).map(d=>d[0]).join(' ');
+    return `<div class="tpl-list-item">
+      <span class="tli-name">${esc(r.label||'Reminder')}<span class="tli-tag">${esc(r.time)} · ${esc(daysLabel)}</span>${!r.enabled?'<span class="tli-tag">Paused</span>':''}</span>
+      <span class="tli-actions">
+        <button class="icon-btn" title="${r.enabled?'Pause':'Resume'}" onclick="toggleReminder('${r.id}')"><svg viewBox="0 0 24 24">${r.enabled?'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>':'<polygon points="5 3 19 12 5 21 5 3"/>'}</svg></button>
+        <button class="icon-btn" title="Edit" onclick="editReminder('${r.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="icon-btn" title="Delete" onclick="deleteReminder('${r.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </span></div>`;
+  }).join('')||'<div class="empty-note" style="padding:16px 0">No reminders yet.</div>';
+  const remindersBlock=`<div class="sync-status">
+      ${permOk?'<span class="ok">Notifications are on ✓</span>':(permDenied?'<span class="err">Notifications are blocked — turn them on for this site in your browser settings.</span>':'Turn on notifications so reminders can appear.')}
+      <br/>Reminders are best-effort: they usually arrive on time while Daybook is installed and opened now and then, but the browser can delay or skip one if it hasn’t run for a while — there’s no server pushing these.
+    </div>
+    ${(!permOk&&!permDenied)?`<div class="set-row"><button class="btn primary" onclick="requestNotifPermission()">Enable notifications</button></div>`:''}
+    ${remRows}
+    <div style="margin-top:12px"><button class="btn" onclick="editReminder(null)">+ Add a reminder</button></div>`;
   const tplRows=getTemplates().map(t=>`<div class="tpl-list-item">
       <span class="tli-name">${esc(t.name)}${t.builtin?'<span class="tli-tag">Built-in</span>':''}${t.id===s.defaultTemplate?'<span class="tli-tag" style="color:var(--accent);border-color:var(--accent)">Default</span>':''}</span>
       <span class="tli-actions">
@@ -1275,6 +1573,8 @@ function renderSettings(el){
     ${tplRows}
     <div style="margin-top:12px"><button class="btn" onclick="editTpl(null)">+ Design your own</button></div>
   </div>
+
+  <div class="set-block"><div class="set-label">Reminders</div>${remindersBlock}</div>
 
   <div class="set-block"><div class="set-label">Sync</div>${syncBlock}</div>
 
