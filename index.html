@@ -229,7 +229,7 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
   <header>
     <div class="header-stripe"></div>
     <div class="header-inner">
-      <span class="brand-name" style="font-family:'Cormorant Garamond',serif">DAYBOOK</span>
+      <span class="brand-name" style="font-family:'Cormorant Garamond',serif;cursor:pointer" onclick="showView('today')">DAYBOOK</span>
       <span class="brand-sub" id="header-date"></span>
     </div>
   </header>
@@ -245,6 +245,7 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
   <input type="file" id="file-vid-cam" accept="video/*" capture="environment"/>
   <input type="file" id="file-vid-lib" accept="video/*" multiple/>
   <input type="file" id="import-file" accept="application/json"/>
+  <button class="stars-fab" id="stars-fab-btn" style="display:none" onclick="showView('rewards')" title="Rewards">★</button>
 </div>
 
 <div id="modal-root"></div>
@@ -831,6 +832,7 @@ function showView(v){
   else if(v==='calendar')renderCalendar(el);
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
+  updateStarsFab();
   window.scrollTo(0,0);
 }
 
@@ -865,7 +867,6 @@ function renderToday(el){
     <button class="btn" onclick="downloadDay('${k}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export day</button>
     ${stored?`<button class="btn danger" onclick="deleteDay('${k}')">Delete entry</button>`:''}
   </div>`;
-  if(starsAllowed())h+=`<button class="stars-fab" onclick="showView('rewards')" title="Rewards">★</button>`;
   el.innerHTML=h;
   requestAnimationFrame(()=>el.querySelectorAll('textarea').forEach(autogrow));
 }
@@ -925,7 +926,7 @@ function deleteDay(k){
     (existing.videos||[]).forEach(v=>idbDeleteVideo(v.id).catch(()=>{}));
     (existing.photos||[]).forEach(p=>{idbDeletePhoto(p.id).catch(()=>{});deleteRemotePhoto(p.id).catch(()=>{});});
   }
-  curEntry=null;showView('today');
+  curEntry=null;showView(currentView);
 }
 
 // ── PHOTOS ──
@@ -1137,7 +1138,7 @@ function renderEntries(el){
   else h+=shown.map(k=>{
     const e=all[k],d=parseKey(k),m=entryMood(e),sn=entrySnippet(e);
     return `<div class="entry-card" onclick="openDay('${k}')">
-      <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${m?m.e+' ':''}${esc(fmtFull(d))}</span><span class="ec-meta">${esc(templateById(e.t).name)}</span></div>
+      <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${m?m.e+' ':''}${esc(fmtFull(d))}</span><span style="display:flex;align-items:center;gap:8px"><span class="ec-meta">${esc(templateById(e.t).name)}</span><button class="icon-btn" title="Delete entry" onclick="event.stopPropagation();deleteDay('${k}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
       ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
       ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.thumb||p.img||''}" alt=""/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt=""/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
     </div>`;}).join('');
@@ -1188,6 +1189,12 @@ function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMont
 
 // ── STARS / REWARDS (beta — visible only to emails in STARS_BETA_EMAILS above) ──
 function starsAllowed(){return !!currentUserEmail&&STARS_BETA_EMAILS.map(x=>x.toLowerCase()).includes(String(currentUserEmail).toLowerCase());}
+// The FAB lives in the static shell (outside #view) so it survives every view's
+// innerHTML replacement — just toggle whether it's shown, from showView().
+function updateStarsFab(){
+  const btn=document.getElementById('stars-fab-btn');
+  if(btn)btn.style.display=(starsAllowed()&&currentView!=='rewards')?'flex':'none';
+}
 function starsData(){return Object.assign({balance:0,log:[],earnActivities:[],spendRewards:[]},userData('stars',{}));}
 function saveStars(patch){const s=Object.assign(starsData(),patch);s.updated=Date.now();saveData('stars',s);}
 // Auto-scaling slider max: rounds up to a "nice" number a bit above the current balance.
