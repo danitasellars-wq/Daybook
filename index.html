@@ -1264,7 +1264,13 @@ function renderRewards(el){
   const bigMarkPct=Math.min(100,(100/max)*100);
   const ticks=[0,.25,.5,.75,1].map(f=>fmtStars(Math.round(max*f)));
   const log=(s.log||[]).slice().sort((a,b)=>b.at-a.at).slice(0,8);
-  const logHtml=log.map(l=>`<div class="tpl-list-item"><span class="tli-name">${esc(l.label)}<span class="tli-tag">${starsTimeAgo(l.at)}</span></span><span class="stars-item-value" style="color:${l.type==='earn'?'#2a7a4a':'var(--accent)'}">${l.type==='earn'?'+':'−'}${l.stars} ★</span></div>`).join('');
+  const logHtml=log.map(l=>`<div class="tpl-list-item">
+      <span class="tli-name">${esc(l.label)}<span class="tli-tag">${starsTimeAgo(l.at)}</span></span>
+      <span class="tli-actions">
+        <span class="stars-item-value" style="color:${l.type==='earn'?'#2a7a4a':'var(--accent)'}">${l.type==='earn'?'+':'−'}${l.stars} ★</span>
+        <button class="icon-btn" title="Edit" onclick="openEditLogItem('${l.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="icon-btn" title="Delete" onclick="deleteLogItem('${l.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </span></div>`).join('');
   el.innerHTML=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Rewards</div><div class="section-sub">Earn stars, then spend them on the things you love.</div></div></div>
     <div class="stars-balance-card">
       <div class="stars-balance-head">Star Balance <button class="stars-info-btn" onclick="openStarsInfo()">i</button></div>
@@ -1300,6 +1306,40 @@ function redeemReward(id){
   if(!confirm(`Redeem "${r.label}" for ${r.stars} ★?`))return;
   s.balance=s.balance-r.stars;
   s.log=(s.log||[]).concat([{id:uid(),type:'spend',label:r.label,stars:r.stars,at:Date.now()}]);
+  saveStars(s);refreshRewards();
+}
+function openEditLogItem(id){
+  const s=starsData();
+  const l=(s.log||[]).find(x=>x.id===id);if(!l)return;
+  const body=`<div class="tb-name"><input id="li-label" placeholder="Description" value="${esc(l.label)}"/></div>
+    <div class="field"><div class="field-label">Stars ${l.type==='earn'?'earned':'spent'}</div><div class="vfield"><input id="li-stars" type="number" min="0" step="1" value="${l.stars}"/></div></div>
+    <p style="font-size:.78rem;color:var(--muted);font-style:italic;margin-top:-8px">Changing the stars here also adjusts your balance.</p>
+    <div class="tb-actions">
+      <button class="btn primary" onclick="saveLogItem('${id}')">Save</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>`;
+  openModal(body,'Edit activity');
+  setTimeout(()=>{const elx=document.getElementById('li-label');if(elx)elx.focus();},50);
+}
+function saveLogItem(id){
+  const label=(document.getElementById('li-label').value||'').trim();
+  const stars=Math.max(0,Math.round(Number(document.getElementById('li-stars').value)||0));
+  if(!label){alert('Add a description.');return;}
+  const s=starsData();
+  const l=(s.log||[]).find(x=>x.id===id);if(!l)return;
+  const oldDelta=l.type==='earn'?l.stars:-l.stars;
+  const newDelta=l.type==='earn'?stars:-stars;
+  s.balance=(s.balance||0)+(newDelta-oldDelta);
+  l.label=label;l.stars=stars;
+  saveStars(s);closeModal();refreshRewards();
+}
+function deleteLogItem(id){
+  if(!confirm('Delete this activity? Your star balance will be adjusted to undo it.'))return;
+  const s=starsData();
+  const l=(s.log||[]).find(x=>x.id===id);if(!l)return;
+  const delta=l.type==='earn'?l.stars:-l.stars;
+  s.balance=(s.balance||0)-delta;
+  s.log=(s.log||[]).filter(x=>x.id!==id);
   saveStars(s);refreshRewards();
 }
 function openAddStarsItem(kind,editId){
