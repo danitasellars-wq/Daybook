@@ -9,7 +9,7 @@
 <title>DAYBOOK</title>
 <link rel="manifest" href="manifest.json"/>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600&family=Nunito:wght@400;600;700&family=Caveat:wght@400;600&family=Patrick+Hand&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Cormorant+Garamond:wght@400;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600&family=Nunito:wght@400;600;700&family=Caveat:wght@400;600&family=Patrick+Hand&family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#f7f3ee;--panel:#fffdf9;--ink:#201810;--muted:#8b7d6b;--line:#e6dccb;--accent:#a85c32;--accent-soft:rgba(168,92,50,.12);--fs:16px}
@@ -209,6 +209,66 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 .stars-tab{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:9px 6px;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);transition:all .2s}
 .stars-tab.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600}
 .stars-item-value{font-family:'Cormorant Garamond',serif;font-size:1rem;color:#c99a2e;white-space:nowrap;flex-shrink:0}
+
+/* ============ EDITORIAL LAYER — modern refresh (overrides the rules above) ============ */
+/* Typography: clean sans for all UI; serif reserved for large display; the user's chosen
+   font stays for their actual writing. No tracked ALL-CAPS micro-labels, no italics. */
+:root{--sans:'DM Sans',system-ui,-apple-system,"Segoe UI",sans-serif;--serif:'Cormorant Garamond',serif}
+#app,#auth-screen,.modal-box{font-family:var(--sans)}
+body{font-family:var(--sans)}
+/* The journal writing itself keeps the user's chosen font */
+.vfield input,.vfield textarea,.ec-snippet{font-family:var(--user-font,'EB Garamond',serif)}
+/* Large display stays serif, with proper lining numerals (so "1" isn't an "I") */
+.section-title,.modal-title,.day-date,.cal-title,.masthead-title,.brand-name,.ec-date,
+.stars-balance-num,.stars-item-value,.cal-title{font-family:var(--serif)}
+.day-date,.cal-title,.stars-balance-num,.stars-item-value,.ec-date,.cal-cell,.stars-slider-ticks,
+.cal-stats b,.stars-slider-mark{font-variant-numeric:lining-nums;font-feature-settings:"lnum" 1,"onum" 0}
+/* Placeholders: no italics in the modern look */
+input::placeholder,textarea::placeholder{font-style:normal}
+/* Font-picker category tags: sans, sentence case (not serif caps) */
+.font-opt small{font-family:var(--sans);text-transform:none;letter-spacing:.01em;font-size:.72rem}
+/* Kill the uppercase + heavy tracking + italics everywhere in the UI */
+.nav-btn,.field-label,.tpl-row label,.day-dow,.mood-opt .m-label,.btn,.btn.small,.set-label,
+.export-label,.ts-name,.cc-item,.size-opt,.tli-tag,.cal-dow,.masthead-sub,.masthead-tagline,
+.brand-sub,.stars-balance-head,.stars-tab,.section-title,.modal-title,.stars-slider-ticks{
+  text-transform:none;letter-spacing:.005em}
+.section-sub,.ec-meta,.today-jump,.auth-note,.auth-local,.sync-status,.empty-note,.cal-stats,
+.editor-foot,.list-num,.font-opt small,.stars-info-btn,.cc-item,.signed-in-as{font-style:normal}
+/* Readable minimum sizes (~12px floor) */
+.nav-btn{font-size:.66rem}
+.field-label,.set-label,.export-label,.stars-balance-head{font-size:.76rem;font-weight:600;color:var(--muted)}
+.day-dow{font-size:.74rem;letter-spacing:.04em}
+.mood-opt .m-label{font-size:.66rem}
+.ts-name,.cc-item{font-size:.66rem}
+.cal-dow{font-size:.68rem}
+.section-sub{font-size:.86rem}
+/* Serif display headings: sentence case, no uppercase */
+.section-title{text-transform:none;letter-spacing:0;font-weight:700;font-size:1.7rem}
+.modal-title{text-transform:none;letter-spacing:0;font-size:1.35rem;font-weight:700}
+/* Pill buttons */
+.btn{border-radius:999px;font-size:.82rem;font-weight:600;letter-spacing:.01em;padding:9px 18px}
+.btn.small{font-size:.76rem;padding:7px 14px}
+.stars-tab{border-radius:999px;font-size:.78rem;font-weight:600}
+.size-opt{border-radius:999px;font-size:.76rem}
+/* Rounder, softer cards & inputs */
+.set-block,.entry-card,.vfield,.stars-balance-card,.tb-field,.tb-name input,.search-wrap input,
+.theme-swatch,.font-opt,.mood-opt,.photo-thumb,.video-thumb,.tpl-row select,.cal-cell,
+.icon-btn,.cc-item input[type=color]{border-radius:12px}
+.modal-box{border-radius:20px 20px 16px 16px;border-top:none;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+/* Lighter, more modern dividers — drop the dated barcode stripes */
+.header-stripe{display:none}
+#auth-screen::before,#auth-screen::after{display:none}
+.section-rule{border-top-width:1.5px}
+.brand-sub{font-size:.62rem;letter-spacing:.06em}
+/* Toast + earned-confirmation feedback for the rewards buttons */
+#toast-wrap{position:fixed;left:0;right:0;bottom:calc(110px + env(safe-area-inset-bottom));z-index:600;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{background:var(--ink);color:var(--bg);font-family:var(--sans);font-size:.86rem;font-weight:600;padding:10px 18px;border-radius:999px;box-shadow:0 6px 24px rgba(0,0,0,.28);animation:toastIn .25s ease, toastOut .3s ease 1.4s forwards}
+.toast.good{background:#2a7a4a}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-8px)}}
+.btn.earned{background:#2a7a4a!important;border-color:#2a7a4a!important;color:#fff!important}
+.stars-balance-num.bump{animation:balBump .5s ease}
+@keyframes balBump{0%{transform:scale(1)}35%{transform:scale(1.18);color:#2a7a4a}100%{transform:scale(1)}}
 </style>
 </head>
 <body>
@@ -249,6 +309,7 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 </div>
 
 <div id="modal-root"></div>
+<div id="toast-wrap"></div>
 
 <script>
 // ── CONSTANTS ──
@@ -348,7 +409,7 @@ function applyAppearance(){
   r.setProperty('--muted',v.muted);r.setProperty('--line',v.line);r.setProperty('--accent',v.accent);
   r.setProperty('--accent-soft',`color-mix(in srgb, ${v.accent} 12%, transparent)`);
   const f=FONTS.find(x=>x.n===s.font)||FONTS[0];
-  document.body.style.fontFamily=f.css;
+  r.setProperty('--user-font',f.css);
   r.setProperty('--fs',{s:'14.5px',m:'16px',l:'17.5px',xl:'19px'}[s.size]||'16px');
   const meta=document.getElementById('theme-color-meta');if(meta&&!String(v.bg).includes('mix'))meta.content=v.bg;
 }
@@ -859,7 +920,7 @@ function renderToday(el){
       <button class="btn small" onclick="document.getElementById('file-vid-cam').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Record video</button>
       <button class="btn small" onclick="document.getElementById('file-vid-lib').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Add video</button>
     </div>
-    <div style="font-size:.7rem;color:var(--muted);font-style:italic;margin-top:8px">Photos sync across all your devices. Videos stay on this device only, but you can send them with Share below.</div>
+    <div style="font-size:.74rem;color:var(--muted);margin-top:10px;line-height:1.5">Photos sync across all your devices. Videos stay on this device only, but you can send them with Share below.</div>
     </div>`;
   h+=`<div class="editor-foot"><span id="save-status"></span><span id="word-count">${wordLabel()}</span></div>`;
   h+=`<div class="entry-actions">
@@ -1245,7 +1306,7 @@ function starsRowsHtml(){
       <span class="tli-name">${esc(x.label)}</span>
       <span class="tli-actions">
         <span class="stars-item-value">${x.stars} ★</span>
-        <button class="btn small" onclick="${rewardsTab==='earn'?`earnStars('${x.id}')`:`redeemReward('${x.id}')`}">${rewardsTab==='earn'?'Earn':'Redeem'}</button>
+        <button class="btn small" onclick="${rewardsTab==='earn'?`earnStars('${x.id}',this)`:`redeemReward('${x.id}')`}">${rewardsTab==='earn'?'Earn':'Redeem'}</button>
         <button class="icon-btn" title="Edit" onclick="openAddStarsItem('${rewardsTab}','${x.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
         <button class="icon-btn" title="Delete" onclick="deleteStarsItem('${rewardsTab}','${x.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </span></div>`).join(''):`<div class="empty-note">${q?'Nothing found.':(rewardsTab==='earn'?'No ways to earn yet — add your first!':'No rewards yet — add something worth saving up for.')}</div>`;
@@ -1292,12 +1353,31 @@ function openStarsInfo(){
   openModal(`<p style="font-size:.92rem;line-height:1.6">Earn stars for the things you agree are worth rewarding, then spend them on treats you both add to the list. It's just a running total — earn as many as you like, spend whenever you like.</p>
     <div class="tb-actions"><button class="btn" onclick="closeModal()">Close</button></div>`,'How stars work');
 }
-function earnStars(id){
+function showToast(msg,good){
+  const wrap=document.getElementById('toast-wrap');if(!wrap)return;
+  const t=document.createElement('div');t.className='toast'+(good?' good':'');t.textContent=msg;
+  wrap.appendChild(t);
+  setTimeout(()=>{t.remove();},1800);
+}
+function bumpBalance(newBal){
+  const el=document.querySelector('.stars-balance-num');if(!el)return;
+  if(el.firstChild&&el.firstChild.nodeType===3)el.firstChild.textContent=newBal;
+  el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');
+}
+function earnStars(id,btn){
   const s=starsData();
   const a=s.earnActivities.find(x=>x.id===id);if(!a)return;
+  if(btn&&btn.dataset.busy)return; // guard against rapid double-taps adding loads of stars
   s.balance=(s.balance||0)+a.stars;
   s.log=(s.log||[]).concat([{id:uid(),type:'earn',label:a.label,stars:a.stars,at:Date.now()}]);
-  saveStars(s);refreshRewards();
+  saveStars(s);
+  showToast('+'+a.stars+' ★ earned',true);
+  bumpBalance(s.balance);
+  if(btn){
+    btn.dataset.busy='1';btn.disabled=true;btn.classList.add('earned');
+    btn.textContent='Earned +'+a.stars+' ✓';
+    setTimeout(refreshRewards,1050); // hold the confirmation visible, then refresh the list
+  }else refreshRewards();
 }
 function redeemReward(id){
   const s=starsData();
@@ -1306,7 +1386,10 @@ function redeemReward(id){
   if(!confirm(`Redeem "${r.label}" for ${r.stars} ★?`))return;
   s.balance=s.balance-r.stars;
   s.log=(s.log||[]).concat([{id:uid(),type:'spend',label:r.label,stars:r.stars,at:Date.now()}]);
-  saveStars(s);refreshRewards();
+  saveStars(s);
+  showToast('−'+r.stars+' ★ · '+r.label);
+  bumpBalance(s.balance);
+  refreshRewards();
 }
 function openEditLogItem(id){
   const s=starsData();
@@ -1608,7 +1691,8 @@ function renderSettings(el){
     </div>`:''}
   </div>
 
-  <div class="set-block"><div class="set-label">Font</div>
+  <div class="set-block"><div class="set-label">Writing font</div>
+    <div class="sync-status" style="margin-bottom:12px">The font your journal entries are written in.</div>
     <div class="font-list">${FONTS.map(f=>`<button class="font-opt ${s.font===f.n?'on':''}" style="font-family:${f.css}" onclick="saveSettings({font:'${f.n}'});showView('settings')">${f.n}<small>${f.tag}</small></button>`).join('')}</div>
   </div>
 
