@@ -1360,6 +1360,22 @@ let scDraft=null; // the in-progress rating run, or null when viewing the summar
 function scorecardData(){return Object.assign({habits:[],cards:[],cadence:'week'},userData('scorecard',{}));}
 function saveScorecard(patch){const s=Object.assign(scorecardData(),patch);s.updated=Date.now();saveData('scorecard',s);}
 function ensureScorecardSeeded(){if(userData('scorecard',null))return;saveScorecard({habits:[],cards:[],cadence:'week'});}
+// One-time removal of the habits originally auto-seeded by the app, so the user starts
+// with a clean list they build themselves. Only removes untouched seed labels; runs once.
+const OLD_SC_SEED=['Woke up at a good time','Made my bed','Checked my phone first thing','Ate a healthy breakfast','Moved my body / exercised','Drank enough water','Ate well through the day','Mindless scrolling','Time outdoors','Read or learned something','Alcohol / junk food','Went to bed on time'];
+function cleanupSeededHabits(){
+  const raw=userData('scorecard',null);
+  if(!raw||raw.seedCleared)return;
+  const seedSet=new Set(OLD_SC_SEED.map(s=>s.toLowerCase()));
+  const kept=(raw.habits||[]).filter(h=>!seedSet.has(String(h.label||'').trim().toLowerCase()));
+  saveScorecard({habits:kept,seedCleared:true});
+}
+function clearAllHabits(){
+  if(!(scorecardData().habits||[]).length){closeModal();return;}
+  if(!confirm('Remove all habits from your list? Past scorecards keep their scores.'))return;
+  saveScorecard({habits:[]});
+  openHabitsManager();
+}
 function refreshScorecard(){renderScorecard(document.getElementById('view'));}
 function isoWeekKey(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day+3);const firstThu=new Date(dt.getFullYear(),0,4);const wk=1+Math.round(((dt-firstThu)/86400000-3+((firstThu.getDay()+6)%7))/7);return dt.getFullYear()+'-W'+String(wk).padStart(2,'0');}
 function scPeriodKey(dateStr,cadence){if(cadence==='day')return dateStr;if(cadence==='month')return dateStr.slice(0,7);if(cadence==='week')return isoWeekKey(parseKey(dateStr));return dateStr+'|'+Math.random();}
@@ -1372,6 +1388,7 @@ function updateScorecardDue(){const el=document.getElementById('habits-due');if(
 function scNetHtml(net){const sign=net>0?'+':'';const cls=net>0?'pos':net<0?'neg':'zero';return {sign,cls};}
 function renderScorecard(el){
   ensureScorecardSeeded();
+  cleanupSeededHabits();
   if(scDraft){renderScorecardRunner(el);return;}
   const d=scorecardData();
   const cards=scCardsSorted();
@@ -1489,7 +1506,7 @@ function openHabitsManager(){
   </div>`).join('')||'<div class="empty-note">No habits yet — add your first below.</div>';
   openModal(`<div style="max-height:52vh;overflow:auto;margin:-4px 0">${rows}</div>
     <div class="tb-name" style="margin-top:14px"><input id="hb-new" placeholder="Add a behaviour you want to track…" onkeydown="if(event.key==='Enter'){event.preventDefault();scAddHabitFromModal();}"/></div>
-    <div class="tb-actions"><button class="btn primary" onclick="scAddHabitFromModal()">Add habit</button><button class="btn" onclick="closeModal();refreshScorecard()">Done</button></div>`,'Your habits');
+    <div class="tb-actions"><button class="btn primary" onclick="scAddHabitFromModal()">Add habit</button><button class="btn" onclick="closeModal();refreshScorecard()">Done</button>${(d.habits||[]).length?`<span style="flex:1"></span><button class="btn danger" onclick="clearAllHabits()">Clear all</button>`:''}</div>`,'Your habits');
   setTimeout(()=>{const i=document.getElementById('hb-new');if(i&&!(d.habits||[]).length)i.focus();},50);
 }
 function scAddHabitFromModal(){
