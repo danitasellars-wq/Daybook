@@ -269,6 +269,46 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .btn.earned{background:#2a7a4a!important;border-color:#2a7a4a!important;color:#fff!important}
 .stars-balance-num.bump{animation:balBump .5s ease}
 @keyframes balBump{0%{transform:scale(1)}35%{transform:scale(1.18);color:#2a7a4a}100%{transform:scale(1)}}
+/* ===== HABIT SCORECARD ===== */
+.nav-btn{position:relative}
+.nav-due{position:absolute;top:1px;right:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
+.sc-card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:20px}
+.sc-card-head{display:flex;align-items:center;gap:7px;font-size:.76rem;font-weight:600;color:var(--muted);margin-bottom:10px}
+.sc-big{font-family:var(--serif);font-size:3.2rem;font-weight:700;line-height:1;font-variant-numeric:lining-nums}
+.sc-big.pos{color:#2a7a4a}.sc-big.neg{color:#a82020}.sc-big.zero{color:var(--ink)}
+.sc-when{font-size:.82rem;color:var(--muted);margin-top:6px}
+.sc-breakdown{display:flex;gap:16px;margin-top:14px;font-size:.86rem;color:var(--muted);flex-wrap:wrap}
+.sc-breakdown b{color:var(--ink);font-variant-numeric:lining-nums}
+.sc-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.sc-dot.g{background:#2a7a4a}.sc-dot.n{background:var(--muted)}.sc-dot.b{background:#a82020}
+.sc-trend{margin-top:12px;font-size:.84rem;font-weight:600}
+.sc-trend.up{color:#2a7a4a}.sc-trend.down{color:#a82020}.sc-trend.flat{color:var(--muted)}
+.sc-cadence{display:flex;align-items:center;gap:10px;margin:0 0 20px;flex-wrap:wrap}
+.sc-cadence .lbl{font-size:.78rem;font-weight:600;color:var(--muted)}
+.sc-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.sc-seg button{border:none;background:var(--panel);padding:7px 16px;font-size:.78rem;font-weight:600;color:var(--muted)}
+.sc-seg button.on{background:var(--ink);color:var(--bg)}
+.sc-runner-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.sc-live{font-family:var(--serif);font-size:1.9rem;font-weight:700;font-variant-numeric:lining-nums;line-height:1}
+.sc-live.pos{color:#2a7a4a}.sc-live.neg{color:#a82020}
+.sc-habit{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.sc-habit:last-of-type{border-bottom:none}
+.sc-habit-label{flex:1;font-size:1rem;min-width:0;line-height:1.35}
+.sc-rate{display:inline-flex;gap:6px;flex-shrink:0}
+.sc-rate button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-size:1.25rem;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .12s;line-height:1}
+.sc-rate button.on.good{background:#2a7a4a;border-color:#2a7a4a;color:#fff}
+.sc-rate button.on.neutral{background:var(--muted);border-color:var(--muted);color:#fff}
+.sc-rate button.on.bad{background:#a82020;border-color:#a82020;color:#fff}
+.sc-runner-foot{display:flex;gap:10px;align-items:center;margin-top:18px;padding-top:16px;border-top:1.5px solid var(--ink)}
+.sc-foot-score{flex:1;font-size:.84rem;color:var(--muted)}
+.sc-foot-score b{font-family:var(--serif);font-size:1.5rem;color:var(--ink);font-variant-numeric:lining-nums;display:block;line-height:1.1}
+.sc-foot-score b.pos{color:#2a7a4a}.sc-foot-score b.neg{color:#a82020}
+.sc-hist-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.sc-hist-item:last-child{border-bottom:none}
+.sc-hist-score{font-family:var(--serif);font-size:1.2rem;font-weight:700;font-variant-numeric:lining-nums;flex-shrink:0}
+.sc-hist-score.pos{color:#2a7a4a}.sc-hist-score.neg{color:#a82020}
+.sc-hb-input{flex:1;border:none;border-bottom:1px solid var(--line);outline:none;background:none;font-family:var(--sans);font-size:1rem;padding:4px 0;min-width:0}
+.sc-hb-input:focus{border-bottom-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -298,6 +338,7 @@ input::placeholder,textarea::placeholder{font-style:normal}
     <button class="nav-btn" data-v="today" onclick="showView('today')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Today</button>
     <button class="nav-btn" data-v="entries" onclick="showView('entries')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20v-2.5"/></svg>Entries</button>
     <button class="nav-btn" data-v="calendar" onclick="showView('calendar')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Month</button>
+    <button class="nav-btn" data-v="scorecard" onclick="showView('scorecard')"><span class="nav-due" id="habits-due" style="display:none"></span><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>Habits</button>
     <button class="nav-btn" data-v="settings" onclick="showView('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Style</button>
   </nav>
   <input type="file" id="file-cam" accept="image/*" capture="environment"/>
@@ -558,11 +599,13 @@ async function pullAndMerge(){
   const mS=((lS.updated||0)>=(rS.updated||0))?lS:rS;
   const lSt=userData('stars',{}),rSt=p.stars||{};
   const mSt=((lSt.updated||0)>=(rSt.updated||0))?lSt:rSt;
-  const mStr=JSON.stringify({e:mE,t:mT,s:mS,st:mSt});
-  const localChanged=mStr!==JSON.stringify({e:lE,t:lT,s:lS,st:lSt});
-  const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS,st:rSt});
+  const lSc=userData('scorecard',{}),rSc=p.scorecard||{};
+  const mSc=((lSc.updated||0)>=(rSc.updated||0))?lSc:rSc;
+  const mStr=JSON.stringify({e:mE,t:mT,s:mS,st:mSt,sc:mSc});
+  const localChanged=mStr!==JSON.stringify({e:lE,t:lT,s:lS,st:lSt,sc:lSc});
+  const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS,st:rSt,sc:rSc});
   if(localChanged){
-    setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);setStore(userKey('stars'),mSt);
+    setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);setStore(userKey('stars'),mSt);setStore(userKey('scorecard'),mSc);
     applyAppearance();mirrorReminders(mS);curEntry=null;showView(currentView);
   }
   const migrated=await migrateInlinePhotos();
@@ -570,7 +613,7 @@ async function pullAndMerge(){
 }
 async function pushToDrive(){
   if(!driveAccessToken||!currentUser)return;
-  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),at:Date.now()});
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),scorecard:userData('scorecard',{}),at:Date.now()});
   if(driveFileId){
     await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+driveAccessToken,'Content-Type':'application/json'},body});
   }else{
@@ -751,7 +794,7 @@ async function bkBackupNow(manual){
   if(!gd.enabled||!gd.folderId)return;
   const token=getBkToken();
   if(!token){if(manual)alert('Reconnect Google Drive backup in Settings.');return;}
-  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),exported:Date.now()});
+  const body=JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),scorecard:userData('scorecard',{}),exported:Date.now()});
   try{
     const auth={headers:{Authorization:'Bearer '+token}};
     const q=encodeURIComponent(`'${gd.folderId}' in parents and name='${BACKUP_FILENAME}' and trashed=false`);
@@ -888,12 +931,14 @@ function showView(v){
   stopMic();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
   const el=document.getElementById('view');
+  if(v!=='scorecard')scDraft=null; // leaving the scorecard discards any unsaved rating run
   if(v==='today')renderToday(el);
   else if(v==='entries')renderEntries(el);
   else if(v==='calendar')renderCalendar(el);
+  else if(v==='scorecard')renderScorecard(el);
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
-  updateStarsFab();
+  updateStarsFab();updateScorecardDue();
   window.scrollTo(0,0);
 }
 
@@ -1248,6 +1293,149 @@ function renderCalendar(el){
 }
 function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCalendar(document.getElementById('view'));}
 
+// ── HABIT SCORECARD (based on the Atomic Habits Habits Scorecard) ──
+let scDraft=null; // the in-progress rating run, or null when viewing the summary
+const SC_SEED=['Woke up at a good time','Made my bed','Checked my phone first thing','Ate a healthy breakfast','Moved my body / exercised','Drank enough water','Ate well through the day','Mindless scrolling','Time outdoors','Read or learned something','Alcohol / junk food','Went to bed on time'];
+function scorecardData(){return Object.assign({habits:[],cards:[],cadence:'week'},userData('scorecard',{}));}
+function saveScorecard(patch){const s=Object.assign(scorecardData(),patch);s.updated=Date.now();saveData('scorecard',s);}
+function ensureScorecardSeeded(){if(userData('scorecard',null))return;saveScorecard({habits:SC_SEED.map(l=>({id:uid(),label:l})),cards:[],cadence:'week'});}
+function refreshScorecard(){renderScorecard(document.getElementById('view'));}
+function isoWeekKey(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day+3);const firstThu=new Date(dt.getFullYear(),0,4);const wk=1+Math.round(((dt-firstThu)/86400000-3+((firstThu.getDay()+6)%7))/7);return dt.getFullYear()+'-W'+String(wk).padStart(2,'0');}
+function scPeriodKey(dateStr,cadence){if(cadence==='month')return dateStr.slice(0,7);if(cadence==='week')return isoWeekKey(parseKey(dateStr));return dateStr+'|'+Math.random();}
+function scPeriodLabel(cadence){return cadence==='month'?'this month':cadence==='week'?'this week':'';}
+function scoreCard(card){let g=0,n=0,b=0;const r=(card&&card.ratings)||{};Object.values(r).forEach(v=>{if(v==='+')g++;else if(v==='-')b++;else if(v==='=')n++;});return {good:g,neutral:n,bad:b,net:g-b,rated:g+n+b};}
+function scCardsSorted(){return (scorecardData().cards||[]).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:(b.at||0)-(a.at||0)));}
+function scCurrentPeriodCard(){const d=scorecardData();if(d.cadence==='none')return null;const pk=scPeriodKey(dkey(new Date()),d.cadence);return (d.cards||[]).find(c=>scPeriodKey(c.date,d.cadence)===pk)||null;}
+function scorecardDue(){const d=scorecardData();if(!d.cadence||d.cadence==='none'||!(d.habits||[]).length)return false;return !scCurrentPeriodCard();}
+function updateScorecardDue(){const el=document.getElementById('habits-due');if(el)el.style.display=scorecardDue()?'block':'none';}
+function scNetHtml(net){const sign=net>0?'+':'';const cls=net>0?'pos':net<0?'neg':'zero';return {sign,cls};}
+function renderScorecard(el){
+  ensureScorecardSeeded();
+  if(scDraft){renderScorecardRunner(el);return;}
+  const d=scorecardData();
+  const cards=scCardsSorted();
+  const latest=cards[0],prev=cards[1];
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Habit scorecard</div><div class="section-sub">Notice your habits — is each one a vote for who you want to be?</div></div></div>`;
+  if(latest){
+    const sc=scoreCard(latest),nh=scNetHtml(sc.net);
+    let trend='';
+    if(prev){const dn=sc.net-scoreCard(prev).net;trend=`<div class="sc-trend ${dn>0?'up':dn<0?'down':'flat'}">${dn>0?'↑ +'+dn:dn<0?'↓ '+dn:'→ no change'} since last time</div>`;}
+    h+=`<div class="sc-card">
+      <div class="sc-card-head">Latest score <button class="stars-info-btn" onclick="openScorecardInfo()">i</button></div>
+      <div class="sc-big ${nh.cls}">${nh.sign}${sc.net}</div>
+      <div class="sc-when">${esc(fmtFull(parseKey(latest.date)))}</div>
+      <div class="sc-breakdown"><span><span class="sc-dot g"></span><b>${sc.good}</b> positive</span><span><span class="sc-dot n"></span><b>${sc.neutral}</b> neutral</span><span><span class="sc-dot b"></span><b>${sc.bad}</b> negative</span></div>
+      ${trend}
+    </div>`;
+  }else{
+    h+=`<div class="sc-card"><div class="sc-card-head">No scores yet <button class="stars-info-btn" onclick="openScorecardInfo()">i</button></div>
+      <p style="font-size:.92rem;line-height:1.6">List the things you do regularly, then mark each one positive, neutral or negative. Your score is simply the positives minus the negatives — a mirror, not a judgement.</p></div>`;
+  }
+  h+=`<div class="sc-cadence"><span class="lbl">Do this</span>
+    <span class="sc-seg">
+      <button class="${d.cadence==='week'?'on':''}" onclick="setScCadence('week')">Weekly</button>
+      <button class="${d.cadence==='month'?'on':''}" onclick="setScCadence('month')">Monthly</button>
+      <button class="${d.cadence==='none'?'on':''}" onclick="setScCadence('none')">Off</button>
+    </span></div>`;
+  const cur=scCurrentPeriodCard(),periodLbl=scPeriodLabel(d.cadence);
+  const startLabel=cur?`Update ${periodLbl?periodLbl+'’s':'your'} scorecard`:(periodLbl?`Start ${periodLbl}’s scorecard`:'New scorecard');
+  h+=`<button class="btn primary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="startScorecard(${cur?`'${cur.id}'`:''})">${startLabel}</button>
+    <button class="btn" style="width:100%;justify-content:center" onclick="openHabitsManager()">Manage my habits (${(d.habits||[]).length})</button>`;
+  if(cards.length){
+    h+=`<div class="set-block" style="margin-top:24px"><div class="set-label">History</div>`+
+      cards.map(c=>{const sc=scoreCard(c),nh=scNetHtml(sc.net);return `<div class="sc-hist-item" onclick="startScorecard('${c.id}')">
+        <div><div style="font-weight:600">${esc(fmtLong(parseKey(c.date)))}</div><div style="font-size:.78rem;color:var(--muted)">${sc.good} positive · ${sc.neutral} neutral · ${sc.bad} negative</div></div>
+        <span class="sc-hist-score ${nh.cls}">${nh.sign}${sc.net}</span></div>`;}).join('')+`</div>`;
+  }
+  el.innerHTML=h;
+}
+function renderScorecardRunner(el){
+  const d=scorecardData(),draft=scDraft,habits=d.habits||[];
+  const sc=scoreCard(draft),nh=scNetHtml(sc.net);
+  const lbl=scPeriodLabel(d.cadence);
+  const dateLbl=(draft.date===dkey(new Date())&&lbl)?(lbl.charAt(0).toUpperCase()+lbl.slice(1)):fmtLong(parseKey(draft.date));
+  let h=`<div class="sc-runner-head">
+    <div><div class="section-title" style="font-family:'Cormorant Garamond',serif;font-size:1.5rem">${esc(dateLbl)}</div><div class="section-sub">Tap +, = or − for each habit.</div></div>
+    <div class="sc-live ${nh.cls==='zero'?'':nh.cls}">${nh.sign}${sc.net}</div>
+  </div>`;
+  if(!habits.length)h+=`<div class="empty-note">No habits yet. Add the behaviours you want to track below.</div>`;
+  else h+=habits.map(hb=>{const r=(draft.ratings||{})[hb.id];return `<div class="sc-habit">
+      <span class="sc-habit-label">${esc(hb.label)}</span>
+      <span class="sc-rate">
+        <button class="good ${r==='+'?'on':''}" onclick="rateHabit('${hb.id}','+')" aria-label="Positive">+</button>
+        <button class="neutral ${r==='='?'on':''}" onclick="rateHabit('${hb.id}','=')" aria-label="Neutral">=</button>
+        <button class="bad ${r==='-'?'on':''}" onclick="rateHabit('${hb.id}','-')" aria-label="Negative">−</button>
+      </span></div>`;}).join('');
+  h+=`<div style="margin-top:14px"><button class="btn small" onclick="scAddHabitPrompt()">+ Add a habit</button></div>`;
+  h+=`<div class="sc-runner-foot">
+    <div class="sc-foot-score"><b class="${nh.cls==='zero'?'':nh.cls}">${nh.sign}${sc.net}</b>${sc.rated} of ${habits.length} rated</div>
+    <button class="btn" onclick="cancelScorecardRun()">Cancel</button>
+    <button class="btn primary" onclick="saveScorecardRun()">Save</button>
+  </div>`;
+  el.innerHTML=h;
+}
+function rateHabit(hid,val){
+  if(!scDraft)return;
+  scDraft.ratings=scDraft.ratings||{};
+  if(scDraft.ratings[hid]===val)delete scDraft.ratings[hid];else scDraft.ratings[hid]=val;
+  renderScorecardRunner(document.getElementById('view'));
+}
+function startScorecard(editId){
+  const d=scorecardData();
+  if(editId){const c=(d.cards||[]).find(x=>x.id===editId);scDraft=c?JSON.parse(JSON.stringify(c)):{id:uid(),date:dkey(new Date()),ratings:{}};}
+  else scDraft={id:uid(),date:dkey(new Date()),ratings:{}};
+  if(!scDraft.ratings)scDraft.ratings={};
+  renderScorecard(document.getElementById('view'));window.scrollTo(0,0);
+}
+function cancelScorecardRun(){scDraft=null;renderScorecard(document.getElementById('view'));window.scrollTo(0,0);}
+function saveScorecardRun(){
+  if(!scDraft)return;
+  if(!scoreCard(scDraft).rated){alert('Mark at least one habit first.');return;}
+  const d=scorecardData();
+  const cards=(d.cards||[]).filter(c=>c.id!==scDraft.id);
+  scDraft.at=Date.now();cards.push(scDraft);
+  saveScorecard({cards});
+  const net=scoreCard(scDraft).net;scDraft=null;
+  showToast('Scorecard saved · '+(net>0?'+':'')+net,net>=0);
+  renderScorecard(document.getElementById('view'));updateScorecardDue();window.scrollTo(0,0);
+}
+function setScCadence(c){saveScorecard({cadence:c});refreshScorecard();updateScorecardDue();}
+function openScorecardInfo(){
+  openModal(`<p style="font-size:.92rem;line-height:1.65">This is the <b>Habits Scorecard</b> from <i>Atomic Habits</i>. List the things you do regularly, then mark each one:</p>
+    <p style="font-size:.95rem;line-height:1.95;margin-top:10px"><b style="color:#2a7a4a">+ &nbsp;Positive</b> — a vote for the person you want to be<br/><b style="color:var(--muted)">= &nbsp;Neutral</b> — neither helps nor hurts<br/><b style="color:#a82020">− &nbsp;Negative</b> — a vote against who you want to be</p>
+    <p style="font-size:.92rem;line-height:1.65;margin-top:10px">Not sure how to mark one? Ask: <i>“Does this cast a vote for or against the identity I want?”</i></p>
+    <p style="font-size:.92rem;line-height:1.65;margin-top:8px">Your score is the positives minus the negatives. There’s no passing mark — the point is simply to notice your habits honestly and watch them shift over time.</p>
+    <div class="tb-actions"><button class="btn" onclick="closeModal()">Got it</button></div>`,'About the scorecard');
+}
+function scAddHabitPrompt(){
+  const label=prompt('Add a habit or behaviour to track:');
+  if(label&&label.trim())addHabit(label.trim());
+  if(scDraft)renderScorecardRunner(document.getElementById('view'));else refreshScorecard();
+}
+function addHabit(label){const d=scorecardData();saveScorecard({habits:(d.habits||[]).concat([{id:uid(),label}])});}
+function renameHabit(id,label){const d=scorecardData();saveScorecard({habits:(d.habits||[]).map(h=>h.id===id?Object.assign({},h,{label:(label||'').trim()||h.label}):h)});}
+function deleteHabit(id){
+  if(!confirm('Remove this habit? Past scorecards keep their scores.'))return;
+  const d=scorecardData();saveScorecard({habits:(d.habits||[]).filter(h=>h.id!==id)});
+  openHabitsManager();
+}
+function openHabitsManager(){
+  const d=scorecardData();
+  const rows=(d.habits||[]).map(h=>`<div class="sc-habit" style="padding:9px 0">
+    <input class="sc-hb-input" value="${esc(h.label)}" onchange="renameHabit('${h.id}',this.value)"/>
+    <button class="icon-btn" title="Remove" onclick="deleteHabit('${h.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+  </div>`).join('')||'<div class="empty-note">No habits yet — add your first below.</div>';
+  openModal(`<div style="max-height:52vh;overflow:auto;margin:-4px 0">${rows}</div>
+    <div class="tb-name" style="margin-top:14px"><input id="hb-new" placeholder="Add a behaviour you want to track…" onkeydown="if(event.key==='Enter'){event.preventDefault();scAddHabitFromModal();}"/></div>
+    <div class="tb-actions"><button class="btn primary" onclick="scAddHabitFromModal()">Add habit</button><button class="btn" onclick="closeModal();refreshScorecard()">Done</button></div>`,'Your habits');
+  setTimeout(()=>{const i=document.getElementById('hb-new');if(i&&!(d.habits||[]).length)i.focus();},50);
+}
+function scAddHabitFromModal(){
+  const i=document.getElementById('hb-new');const v=(i&&i.value||'').trim();
+  if(!v)return;
+  addHabit(v);openHabitsManager();
+}
+
 // ── STARS / REWARDS (beta — visible only to emails in STARS_BETA_EMAILS above) ──
 function starsAllowed(){return !!currentUserEmail&&STARS_BETA_EMAILS.map(x=>x.toLowerCase()).includes(String(currentUserEmail).toLowerCase());}
 // The FAB lives in the static shell (outside #view) so it survives every view's
@@ -1573,7 +1761,7 @@ async function shareMonth(y,m){
 
 // ── BACKUP ──
 function exportBackup(){
-  download(`daybook-backup-${dkey(new Date())}.json`,JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),exported:Date.now()}),'application/json');
+  download(`daybook-backup-${dkey(new Date())}.json`,JSON.stringify({v:1,entries:userData('entries',{}),templates:userData('templates',[]),settings:userData('settings',{}),stars:userData('stars',{}),scorecard:userData('scorecard',{}),exported:Date.now()}),'application/json');
 }
 function importBackup(file){
   if(!file)return;
@@ -1589,6 +1777,14 @@ function importBackup(file){
         const lT=userData('templates',[]);const byId={};
         lT.concat(p.templates).forEach(t=>{const c=byId[t.id];if(!c||(t.updated||0)>(c.updated||0))byId[t.id]=t;});
         setStore(userKey('templates'),Object.values(byId));
+      }
+      if(p.scorecard&&typeof p.scorecard==='object'){
+        const lSc=userData('scorecard',{});
+        if((p.scorecard.updated||0)>=(lSc.updated||0))setStore(userKey('scorecard'),p.scorecard);
+      }
+      if(p.stars&&typeof p.stars==='object'){
+        const lSt=userData('stars',{});
+        if((p.stars.updated||0)>=(lSt.updated||0))setStore(userKey('stars'),p.stars);
       }
       await migrateInlinePhotos();
       saveData('entries',userData('entries',{}));
