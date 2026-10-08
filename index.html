@@ -335,6 +335,18 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .line-chart .grid{stroke:var(--line);stroke-width:1}
 .line-chart .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
 .line-chart .yl,.line-chart .xl{fill:var(--muted);font-size:8px;font-family:var(--sans)}
+.habit-bars{margin-top:4px}
+.hb-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.hb-label{flex:0 0 40%;min-width:0;display:flex;flex-direction:column}
+.hb-name{font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-sub{font-size:.66rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-track{flex:1;height:16px;position:relative;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+.hb-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.hb-fill{position:absolute;top:2px;bottom:2px;border-radius:5px}
+.hb-fill.pos{left:50%;background:#2a7a4a}
+.hb-fill.neg{right:50%;background:#a82020}
+.hb-val{flex:0 0 auto;width:34px;text-align:right;font-family:var(--serif);font-weight:700;font-variant-numeric:lining-nums}
+.hb-val.pos{color:#2a7a4a}.hb-val.neg{color:#a82020}
 </style>
 </head>
 <body>
@@ -1559,6 +1571,30 @@ function starsSeries(period){
   log.forEach(l=>{if(!l.at)return;const key=bucketKey(dkey(new Date(l.at)),period);buckets[key]=(buckets[key]||0)+(l.stars||0);});
   return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:buckets[k]})).slice(-12);
 }
+function balanceSeries(period){
+  const log=(starsData().log||[]).filter(l=>l.at).slice().sort((a,b)=>a.at-b.at);
+  if(!log.length)return [];
+  const bucketEnd={};let bal=0;
+  log.forEach(l=>{bal+=(l.type==='spend'?-(l.stars||0):(l.stars||0));bucketEnd[bucketKey(dkey(new Date(l.at)),period)]=bal;});
+  return Object.keys(bucketEnd).sort().map(k=>({label:bucketLabel(k,period),value:bucketEnd[k]})).slice(-12);
+}
+function habitTotals(){
+  const d=scorecardData(),cards=d.cards||[];
+  return (d.habits||[]).map(h=>{
+    let pos=0,neg=0,neu=0;
+    cards.forEach(c=>{const r=(c.ratings||{})[h.id];if(r==='+')pos++;else if(r==='-')neg++;else if(r==='=')neu++;});
+    return {label:h.label,pos,neg,neu,net:pos-neg,total:pos+neg+neu};
+  }).filter(x=>x.total>0).sort((a,b)=>b.net-a.net);
+}
+function habitTotalsHTML(){
+  const rows=habitTotals();
+  if(!rows.length)return '<div class="empty-note" style="padding:24px 10px">No habit ratings yet — do a scorecard to fill this in.</div>';
+  const maxAbs=Math.max(1,...rows.map(r=>Math.abs(r.net)));
+  return `<div class="habit-bars">${rows.map(r=>{
+    const w=Math.round(Math.abs(r.net)/maxAbs*50),cls=r.net>=0?'pos':'neg';
+    return `<div class="hb-row"><span class="hb-label"><span class="hb-name">${esc(r.label)}</span><span class="hb-sub">${r.pos} positive · ${r.neg} negative${r.neu?' · '+r.neu+' neutral':''}</span></span><span class="hb-track"><span class="hb-center"></span><span class="hb-fill ${cls}" style="width:${w}%"></span></span><span class="hb-val ${cls}">${r.net>0?'+':''}${r.net}</span></div>`;
+  }).join('')}</div>`;
+}
 function setGraphPeriod(p){graphPeriod=p;renderGraphs(document.getElementById('view'));}
 function renderGraphs(el){
   const scoreP=scoreSeries(graphPeriod);
@@ -1580,16 +1616,26 @@ function renderGraphs(el){
     ${lineChartSVG(scoreP,{min:scMin,max:scMax})}
   </div>
   <div class="graph-card">
+    <div class="graph-title">Totals per habit</div>
+    <div class="graph-sub">Net of positive − negative marks across all your scorecards</div>
+    ${habitTotalsHTML()}
+  </div>
+  <div class="graph-card">
     <div class="graph-title">Kept my one thing</div>
     <div class="graph-sub">How often you did the one thing you set${intentP.length?'':' — mark your intention done or not to start the line'}</div>
     ${lineChartSVG(intentP,{min:0,max:100,suffix:'%'})}
   </div>`;
   if(starsAllowed()){
-    const starsP=starsSeries(graphPeriod);
+    const starsP=starsSeries(graphPeriod),balP=balanceSeries(graphPeriod);
     h+=`<div class="graph-card">
     <div class="graph-title">Stars earned</div>
     <div class="graph-sub">Stars earned per ${grp}${starsP.length?'':' — earn some stars to start the line'}</div>
     ${lineChartSVG(starsP,{min:0})}
+  </div>
+  <div class="graph-card">
+    <div class="graph-title">Star balance</div>
+    <div class="graph-sub">Your running balance at the end of each ${grp}${balP.length?'':' — earn or spend stars to start the line'}</div>
+    ${lineChartSVG(balP,{min:0})}
   </div>`;
   }
   el.innerHTML=h;
