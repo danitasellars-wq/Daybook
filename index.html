@@ -309,6 +309,32 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .sc-hist-score.pos{color:#2a7a4a}.sc-hist-score.neg{color:#a82020}
 .sc-hb-input{flex:1;border:none;border-bottom:1px solid var(--line);outline:none;background:none;font-family:var(--sans);font-size:1rem;padding:4px 0;min-width:0}
 .sc-hb-input:focus{border-bottom-color:var(--accent)}
+/* ===== JOURNAL HOME (time-aware) ===== */
+.jh-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}
+.jh-toggle{align-self:center}
+.jh-foot{min-height:18px;margin-top:4px;font-size:.75rem;color:var(--muted);font-style:italic}
+.field-hint{font-size:.78rem;color:var(--muted);margin:-2px 0 10px;line-height:1.45}
+.done-row{display:flex;gap:10px;margin-top:4px}
+.done-opt{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px;font-size:.9rem;font-weight:600;color:var(--muted);transition:all .15s}
+.done-opt.yes.on{background:#2a7a4a;border-color:#2a7a4a;color:#fff}
+.done-opt.no.on{background:#a82020;border-color:#a82020;color:#fff}
+.intention-recall{font-family:var(--serif);font-size:1.15rem;line-height:1.4;color:var(--ink);margin-bottom:12px}
+.intention-recall.muted{font-family:var(--sans);font-size:.92rem;color:var(--muted);font-style:normal}
+.linkbtn{background:none;border:none;color:var(--accent);text-decoration:underline;font-family:var(--sans);font-size:.92rem;padding:0}
+.stars-today{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-left:3px solid #c99a2e;border-radius:12px;padding:14px 18px;margin-top:4px;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--muted)}
+.stars-today b{font-family:var(--serif);font-size:1.5rem;color:#c99a2e;font-variant-numeric:lining-nums}
+.ec-done{font-size:.64rem;font-weight:600;letter-spacing:.02em;color:#2a7a4a;border:1px solid #2a7a4a;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.ec-done.miss{color:var(--muted);border-color:var(--line)}
+/* ===== GRAPHS ===== */
+.graph-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 14px 10px;margin-bottom:18px}
+.graph-title{font-family:var(--serif);font-size:1.25rem;font-weight:700;margin-bottom:2px}
+.graph-sub{font-size:.8rem;color:var(--muted);margin-bottom:10px;line-height:1.4}
+.line-chart{width:100%;height:auto;display:block;overflow:visible}
+.line-chart .ln{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.line-chart .dot{fill:var(--accent)}
+.line-chart .grid{stroke:var(--line);stroke-width:1}
+.line-chart .zero{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
+.line-chart .yl,.line-chart .xl{fill:var(--muted);font-size:8px;font-family:var(--sans)}
 </style>
 </head>
 <body>
@@ -335,10 +361,10 @@ input::placeholder,textarea::placeholder{font-style:normal}
   </header>
   <main id="view"></main>
   <nav id="bottom-nav">
-    <button class="nav-btn" data-v="today" onclick="showView('today')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Today</button>
+    <button class="nav-btn" data-v="today" onclick="showView('today')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Journal</button>
     <button class="nav-btn" data-v="entries" onclick="showView('entries')"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20v-2.5"/></svg>Entries</button>
-    <button class="nav-btn" data-v="calendar" onclick="showView('calendar')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Month</button>
-    <button class="nav-btn" data-v="scorecard" onclick="showView('scorecard')"><span class="nav-due" id="habits-due" style="display:none"></span><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>Habits</button>
+    <button class="nav-btn" data-v="scorecard" onclick="showView('scorecard')"><span class="nav-due" id="habits-due" style="display:none"></span><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>Scorecard</button>
+    <button class="nav-btn" data-v="graphs" onclick="showView('graphs')"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>Graphs</button>
     <button class="nav-btn" data-v="settings" onclick="showView('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Style</button>
   </nav>
   <input type="file" id="file-cam" accept="image/*" capture="environment"/>
@@ -425,15 +451,18 @@ function getEntriesRaw(){return userData('entries',{});}
 function getEntry(k){const e=getEntriesRaw()[k];return (e&&!e.deleted)?e:null;}
 function putEntry(k,e){const all=getEntriesRaw();e.updated=Date.now();all[k]=e;saveData('entries',all);}
 function liveEntryKeys(){const all=getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
-function entryHasContent(e){if(!e)return false;if((e.photos||[]).length)return true;if((e.videos||[]).length)return true;return Object.values(e.v||{}).some(v=>Array.isArray(v)?v.some(x=>String(x||'').trim()):String(v||'').trim());}
-function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',defaultTemplate:'tgt',reminders:[],custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
+// Fixed daily structure (templates replaced): three good things (about the day before,
+// filled in the morning) in v.good[], one intention in v.intention, the evening reflection
+// in v.notes (same id old entries used), and whether the intention was kept in e.done.
+function goodArr(e){const v=(e&&e.v&&e.v.good);return Array.isArray(v)?v:[];}
+function entryHasContent(e){if(!e)return false;if((e.photos||[]).length||(e.videos||[]).length)return true;if(e.done===true||e.done===false)return true;const v=e.v||{};if(goodArr(e).some(x=>String(x||'').trim()))return true;if(String(v.intention||'').trim())return true;if(String(v.notes||'').trim())return true;
+  // legacy entries may hold text under other field ids
+  return Object.values(v).some(x=>Array.isArray(x)?x.some(y=>String(y||'').trim()):(typeof x==='string'&&x.trim()));}
+function settingsData(){return Object.assign({font:'EB Garamond',theme:'paper',size:'m',reminders:[],custom:{bg:'#f7f3ee',ink:'#201810',accent:'#a85c32'}},userData('settings',{}));}
 function saveSettings(patch){const s=Object.assign(settingsData(),patch);s.updated=Date.now();saveData('settings',s);applyAppearance();mirrorReminders(s);}
-function customTemplates(){return userData('templates',[]).filter(t=>!t.deleted);}
-function getTemplates(){return BUILTINS.concat(customTemplates());}
-function templateById(id){return getTemplates().find(t=>t.id===id)||BUILTINS[0];}
-function entryMood(e){if(!e)return null;const tpl=templateById(e.t);const mf=tpl.fields.find(f=>f.type==='mood');const v=mf?e.v[mf.id]:null;return MOODS.find(m=>m.v===v)||null;}
-function entrySnippet(e){const tpl=templateById(e.t);for(const f of tpl.fields){const v=e.v[f.id];if(f.type==='mood')continue;if(Array.isArray(v)){const t=v.filter(x=>String(x||'').trim()).join(' · ');if(t)return t;}else if(String(v||'').trim())return v.trim();}return '';}
-function entryWords(e){let n=0;const tpl=templateById(e.t);tpl.fields.forEach(f=>{const v=e.v[f.id];const txt=Array.isArray(v)?v.join(' '):(typeof v==='string'?v:'');n+=txt.split(/\s+/).filter(Boolean).length;});return n;}
+function entrySnippet(e){const g=goodArr(e).filter(x=>String(x||'').trim());if(g.length)return g.join(' · ');const v=e.v||{};if(String(v.notes||'').trim())return v.notes.trim();if(String(v.intention||'').trim())return 'I will '+v.intention.trim().replace(/^i will\s+/i,'');
+  for(const x of Object.values(v)){if(Array.isArray(x)){const t=x.filter(y=>String(y||'').trim()).join(' · ');if(t)return t;}else if(typeof x==='string'&&x.trim())return x.trim();}return '';}
+function entryWords(e){const v=(e&&e.v)||{};let t=goodArr(e).join(' ')+' '+(v.intention||'')+' '+(v.notes||'');return t.split(/\s+/).filter(Boolean).length;}
 
 // ── APPEARANCE ──
 function themeVars(){
@@ -482,7 +511,7 @@ function enterApp(sub,email,name){
   setupFileInputs();
   showView('today');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-  migrateInlinePhotos().then(changed=>{if(changed){curEntry=null;showView(currentView);}}).catch(()=>{});
+  migrateInlinePhotos().then(changed=>{if(changed){clearDraftCache();showView(currentView);}}).catch(()=>{});
   setupReminderSW();
   mirrorReminders(settingsData());
   setInterval(checkDueRemindersForeground,60000);
@@ -606,7 +635,7 @@ async function pullAndMerge(){
   const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS,st:rSt,sc:rSc});
   if(localChanged){
     setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);setStore(userKey('stars'),mSt);setStore(userKey('scorecard'),mSc);
-    applyAppearance();mirrorReminders(mS);curEntry=null;showView(currentView);
+    applyAppearance();mirrorReminders(mS);clearDraftCache();showView(currentView);
   }
   const migrated=await migrateInlinePhotos();
   return (pushNeeded||migrated)?'pushneeded':'insync';
@@ -927,6 +956,7 @@ function deleteReminder(id){
 
 // ── NAV ──
 function showView(v){
+  if(currentView==='today'&&v!=='today')flushDrafts();
   currentView=v;
   stopMic();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===v));
@@ -934,7 +964,7 @@ function showView(v){
   if(v!=='scorecard')scDraft=null; // leaving the scorecard discards any unsaved rating run
   if(v==='today')renderToday(el);
   else if(v==='entries')renderEntries(el);
-  else if(v==='calendar')renderCalendar(el);
+  else if(v==='graphs')renderGraphs(el);
   else if(v==='scorecard')renderScorecard(el);
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
@@ -942,88 +972,116 @@ function showView(v){
   window.scrollTo(0,0);
 }
 
-// ── EDITOR ──
-function renderToday(el){
-  const k=viewDate,d=parseKey(k),todayKey=dkey(new Date());
-  const isToday=k===todayKey,isFuture=k>todayKey;
-  const stored=getEntry(k);
-  curEntry=stored?JSON.parse(JSON.stringify(stored)):{t:settingsData().defaultTemplate,v:{},photos:[],created:Date.now()};
-  const tpl=templateById(curEntry.t);
-  let h=`<div class="day-nav">
-    <button class="day-step" onclick="stepDay(-1)">‹</button>
-    <div class="day-title"><div class="day-dow">${isToday?'Today':esc(fmtDow(d))}</div><div class="day-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtLong(d))}</div></div>
-    <button class="day-step" onclick="stepDay(1)" ${isToday||isFuture?'disabled':''}>›</button>
-  </div>`;
-  if(!isToday)h+=`<button class="today-jump" onclick="goToday()">back to today</button>`;
-  h+=`<div class="tpl-row"><label>Template</label><select onchange="switchTpl(this.value)">${getTemplates().map(t=>`<option value="${t.id}" ${t.id===curEntry.t?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>`;
-  h+=tpl.fields.map(renderField).join('');
-  h+=`<div class="field"><div class="field-label">Photos & videos</div>
-    <div class="photo-strip" id="photo-strip">${(curEntry.photos||[]).map(p=>`<div class="photo-thumb" onclick="viewPhoto('${p.id}')"><img src="${p.thumb||p.img||''}" alt=""/></div>`).join('')}${(curEntry.videos||[]).map(v=>`<div class="video-thumb" onclick="viewVideo('${v.id}')"><img src="${v.thumb||''}" alt=""/><span class="play-badge"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span></div>`).join('')}</div>
+// ── JOURNAL (time-aware home + full day editor; fixed daily structure) ──
+let journalMode=null; // null = auto by clock; 'morning' | 'evening' override
+let drafts={},dsaveTimers={};
+const INTENTION_PH='I will [behaviour] at [time] in [location]';
+function getDraft(k){if(!drafts[k]){const e=getEntry(k);drafts[k]=e?JSON.parse(JSON.stringify(e)):{v:{},photos:[],videos:[],created:Date.now()};if(!drafts[k].v)drafts[k].v={};}return drafts[k];}
+function markSaveStatus(t){const st=document.getElementById('save-status');if(st)st.textContent=t;}
+function saveDraftSoon(k){markSaveStatus('writing…');if(dsaveTimers[k])clearTimeout(dsaveTimers[k]);dsaveTimers[k]=setTimeout(()=>commitDraft(k),600);}
+function commitDraft(k){const dft=drafts[k];if(!dft)return;if(dsaveTimers[k]){clearTimeout(dsaveTimers[k]);delete dsaveTimers[k];}if(entryHasContent(dft))putEntry(k,dft);markSaveStatus('saved ✓');}
+function flushDrafts(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};Object.keys(drafts).forEach(k=>{if(entryHasContent(drafts[k]))putEntry(k,drafts[k]);});drafts={};}
+function clearDraftCache(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};drafts={};}
+function autogrow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';}
+function micBtn(){return SR?`<button class="mic" onclick="toggleMic(this)" title="Dictate">${MIC_SVG}</button>`:'';}
+function jGood(k,i,el){const dft=getDraft(k);const arr=goodArr(dft).slice();arr[i]=el.value;dft.v.good=arr;saveDraftSoon(k);}
+function jText(k,field,el){const dft=getDraft(k);dft.v[field]=el.value;if(el.tagName==='TEXTAREA')autogrow(el);saveDraftSoon(k);}
+function jSetDone(k,val){const dft=getDraft(k);dft.done=(dft.done===val?undefined:val);commitDraft(k);renderToday(document.getElementById('view'));}
+function goodBlock(k,label,hint){
+  const dft=getDraft(k),arr=goodArr(dft);
+  let rows='';for(let i=0;i<3;i++)rows+=`<div class="vfield"><span class="list-num">${i+1}.</span><input value="${esc(arr[i]||'')}" oninput="jGood('${k}',${i},this)" placeholder="${i===0?'Something good…':''}"/>${micBtn()}</div>`;
+  return `<div class="field"><div class="field-label">${esc(label)}</div>${hint?`<div class="field-hint">${esc(hint)}</div>`:''}${rows}</div>`;
+}
+function intentionBlock(k){
+  const dft=getDraft(k);
+  return `<div class="field"><div class="field-label">One thing I will do today</div><div class="field-hint">Make it specific — when and where.</div>
+    <div class="vfield tall"><textarea oninput="jText('${k}','intention',this)" placeholder="${INTENTION_PH}">${esc(dft.v.intention||'')}</textarea>${micBtn()}</div></div>`;
+}
+function aboutBlock(k){
+  const dft=getDraft(k);
+  return `<div class="field"><div class="field-label">About today</div>
+    <div class="vfield tall"><textarea oninput="jText('${k}','notes',this)" placeholder="How was today? Write, or tap the mic and speak…">${esc(dft.v.notes||'')}</textarea>${micBtn()}</div></div>`;
+}
+function photoBlock(k){
+  const dft=getDraft(k);
+  return `<div class="field"><div class="field-label">Photos & videos</div>
+    <div class="photo-strip">${(dft.photos||[]).map(p=>`<div class="photo-thumb" onclick="viewPhoto('${p.id}')"><img src="${p.thumb||p.img||''}" alt=""/></div>`).join('')}${(dft.videos||[]).map(v=>`<div class="video-thumb" onclick="viewVideo('${v.id}')"><img src="${v.thumb||''}" alt=""/><span class="play-badge"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span></div>`).join('')}</div>
     <div class="photo-add-row">
       <button class="btn small" onclick="document.getElementById('file-cam').click()"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
       <button class="btn small" onclick="document.getElementById('file-lib').click()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Add photos</button>
       <button class="btn small" onclick="document.getElementById('file-vid-cam').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Record video</button>
       <button class="btn small" onclick="document.getElementById('file-vid-lib').click()"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Add video</button>
     </div>
-    <div style="font-size:.74rem;color:var(--muted);margin-top:10px;line-height:1.5">Photos sync across all your devices. Videos stay on this device only, but you can send them with Share below.</div>
-    </div>`;
-  h+=`<div class="editor-foot"><span id="save-status"></span><span id="word-count">${wordLabel()}</span></div>`;
-  h+=`<div class="entry-actions">
+    <div style="font-size:.74rem;color:var(--muted);margin-top:10px;line-height:1.5">Photos sync across all your devices. Videos stay on this device only.</div></div>`;
+}
+function entryActions(k){
+  const stored=getEntry(k);
+  return `<div class="editor-foot"><span id="save-status"></span></div>
+    <div class="entry-actions">
     <button class="btn" onclick="shareDay('${k}')"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>Share</button>
     <button class="btn" onclick="downloadDay('${k}')"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export day</button>
     ${stored?`<button class="btn danger" onclick="deleteDay('${k}')">Delete entry</button>`:''}
   </div>`;
+}
+function doneBlock(k,yesLabel){
+  const dft=getDraft(k);
+  if(!String(dft.v.intention||'').trim())return '';
+  return `<div class="field"><div class="field-label">Did you do your one thing?</div>
+    <div class="intention-recall">“${esc(dft.v.intention.trim())}”</div>
+    <div class="done-row">
+      <button class="done-opt yes ${dft.done===true?'on':''}" onclick="jSetDone('${k}',true)">${yesLabel||'Done ✓'}</button>
+      <button class="done-opt no ${dft.done===false?'on':''}" onclick="jSetDone('${k}',false)">Not today</button>
+    </div></div>`;
+}
+function renderToday(el){
+  const todayKey=dkey(new Date());
+  if(viewDate===todayKey){renderJournalHome(el);return;}
+  const k=viewDate,d=parseKey(k);
+  let h=`<div class="day-nav">
+    <button class="day-step" onclick="stepDay(-1)">‹</button>
+    <div class="day-title"><div class="day-dow">${esc(fmtDow(d))}</div><div class="day-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtLong(d))}</div></div>
+    <button class="day-step" onclick="stepDay(1)">›</button>
+  </div>
+  <button class="today-jump" onclick="goToday()">back to today</button>`;
+  h+=goodBlock(k,'Three good things')+intentionBlock(k)+doneBlock(k)+aboutBlock(k)+photoBlock(k)+entryActions(k);
   el.innerHTML=h;
   requestAnimationFrame(()=>el.querySelectorAll('textarea').forEach(autogrow));
 }
-function renderField(f){
-  const v=curEntry.v[f.id];
-  const mic=SR?`<button class="mic" onclick="toggleMic(this)" title="Dictate">${MIC_SVG}</button>`:'';
-  if(f.type==='mood'){
-    return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="mood-row">${MOODS.map(m=>
-      `<button class="mood-opt ${v===m.v?'on':''}" onclick="setMood('${f.id}',${m.v})"><span class="m-emoji">${m.e}</span><span class="m-label">${m.l}</span></button>`).join('')}</div></div>`;
-  }
-  if(f.type==='list'){
-    const arr=Array.isArray(v)?v:[];
-    let rows='';
-    for(let i=0;i<(f.count||3);i++){
-      rows+=`<div class="vfield"><span class="list-num">${i+1}.</span><input data-f="${f.id}" data-i="${i}" value="${esc(arr[i]||'')}" oninput="onField(this)"/>${mic}</div>`;
+function renderJournalHome(el){
+  const todayKey=dkey(new Date());
+  const yKey=(function(){const d=new Date();d.setDate(d.getDate()-1);return dkey(d);})();
+  const hr=new Date().getHours();
+  const mode=journalMode||((hr>=5&&hr<12)?'morning':'evening');
+  const greeting=mode==='morning'?'Good morning':'This evening';
+  let h=`<div class="jh-head">
+    <div><div class="day-dow">${greeting}</div><div class="day-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtLong(new Date()))}</div></div>
+    <span class="sc-seg jh-toggle"><button class="${mode==='morning'?'on':''}" onclick="journalMode='morning';renderToday(document.getElementById('view'))">Morning</button><button class="${mode==='evening'?'on':''}" onclick="journalMode='evening';renderToday(document.getElementById('view'))">Evening</button></span>
+  </div>`;
+  if(mode==='morning'){
+    h+=goodBlock(yKey,'Three good things about yesterday','Reflect on the day just gone while it’s fresh.');
+    h+=intentionBlock(todayKey);
+    h+=`<div class="jh-foot"><span id="save-status"></span></div>`;
+  }else{
+    h+=aboutBlock(todayKey);
+    h+=photoBlock(todayKey);
+    const dft=getDraft(todayKey);
+    if(String(dft.v.intention||'').trim()){
+      h+=doneBlock(todayKey,'I did it ✓');
+    }else{
+      h+=`<div class="field"><div class="intention-recall muted">You didn’t set a “one thing” this morning. <button class="linkbtn" onclick="journalMode='morning';renderToday(document.getElementById('view'))">Add one</button></div></div>`;
     }
-    return `<div class="field"><div class="field-label">${esc(f.label)}</div>${rows}</div>`;
+    if(starsAllowed()){
+      const earned=starsEarnedOn(todayKey);
+      h+=`<div class="stars-today" onclick="showView('rewards')"><span>Stars earned today</span><b>${earned} ★</b></div>`;
+    }
+    h+=`<div class="jh-foot"><span id="save-status"></span></div>`;
   }
-  if(f.type==='text'){
-    return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="vfield"><input data-f="${f.id}" value="${esc(v||'')}" oninput="onField(this)"/>${mic}</div></div>`;
-  }
-  return `<div class="field"><div class="field-label">${esc(f.label)}</div><div class="vfield tall"><textarea data-f="${f.id}" oninput="onField(this)" placeholder="Write, or tap the mic and speak…">${esc(v||'')}</textarea>${mic}</div></div>`;
+  el.innerHTML=h;
+  requestAnimationFrame(()=>el.querySelectorAll('textarea').forEach(autogrow));
 }
-function wordLabel(){const n=curEntry?entryWords(curEntry):0;return n?`${n} word${n===1?'':'s'}`:'';}
-function autogrow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';}
-function onField(el){
-  const f=el.dataset.f,i=el.dataset.i;
-  if(i!==undefined&&i!==null&&i!==''){
-    const arr=Array.isArray(curEntry.v[f])?curEntry.v[f].slice():[];
-    arr[Number(i)]=el.value;curEntry.v[f]=arr;
-  }else curEntry.v[f]=el.value;
-  if(el.tagName==='TEXTAREA')autogrow(el);
-  markDirty();
-}
-function markDirty(){
-  const st=document.getElementById('save-status');if(st)st.textContent='writing…';
-  if(saveTimer)clearTimeout(saveTimer);
-  saveTimer=setTimeout(commitEntry,600);
-}
-function commitEntry(){
-  if(!curEntry||!viewDate)return;
-  putEntry(viewDate,curEntry);
-  const st=document.getElementById('save-status');if(st)st.textContent='saved ✓';
-  const wc=document.getElementById('word-count');if(wc)wc.textContent=wordLabel();
-}
-function setMood(fid,v){curEntry.v[fid]=(curEntry.v[fid]===v?null:v);commitEntry();renderToday(document.getElementById('view'));}
-function switchTpl(id){curEntry.t=id;if(entryHasContent(curEntry))commitEntry();renderToday(document.getElementById('view'));}
-function stepDay(n){flushEntry();const d=parseKey(viewDate);d.setDate(d.getDate()+n);viewDate=dkey(d);showView('today');}
-function goToday(){flushEntry();viewDate=dkey(new Date());showView('today');}
-function openDay(k){flushEntry();viewDate=k;showView('today');}
-function flushEntry(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;if(curEntry&&entryHasContent(curEntry))commitEntry();}}
+function stepDay(n){flushDrafts();const d=parseKey(viewDate);d.setDate(d.getDate()+n);viewDate=dkey(d);showView('today');}
+function goToday(){flushDrafts();journalMode=null;viewDate=dkey(new Date());showView('today');}
+function openDay(k){flushDrafts();viewDate=k;showView('today');}
 function deleteDay(k){
   if(!confirm('Delete this whole entry, including its photos and videos?'))return;
   const existing=getEntry(k);
@@ -1032,7 +1090,7 @@ function deleteDay(k){
     (existing.videos||[]).forEach(v=>idbDeleteVideo(v.id).catch(()=>{}));
     (existing.photos||[]).forEach(p=>{idbDeletePhoto(p.id).catch(()=>{});deleteRemotePhoto(p.id).catch(()=>{});});
   }
-  curEntry=null;showView(currentView);
+  delete drafts[k];viewDate=dkey(new Date());showView('today');
 }
 
 // ── PHOTOS ──
@@ -1057,14 +1115,16 @@ async function processPhoto(file){
 }
 async function addPhotos(files){
   if(!files||!files.length||currentView!=='today')return;
+  const k=viewDate,dft=getDraft(k);
   for(const f of Array.from(files)){
-    try{const {blob,thumb,w,h}=await processPhoto(f);const id=uid();await idbPutPhoto(id,blob);curEntry.photos=curEntry.photos||[];curEntry.photos.push({id,thumb,w,h});}catch(e){}
+    try{const {blob,thumb,w,h}=await processPhoto(f);const id=uid();await idbPutPhoto(id,blob);dft.photos=dft.photos||[];dft.photos.push({id,thumb,w,h});}catch(e){}
   }
-  commitEntry();renderToday(document.getElementById('view'));
+  commitDraft(k);renderToday(document.getElementById('view'));
   if(driveAccessToken&&currentUser!=='local')syncPhotoFiles().catch(()=>{});
 }
 async function viewPhoto(pid){
-  const p=(curEntry.photos||[]).find(x=>x.id===pid);if(!p)return;
+  const dft=getDraft(viewDate);
+  const p=(dft.photos||[]).find(x=>x.id===pid);if(!p)return;
   openModal(`<div class="photo-full"><img id="photo-full-img" src="${p.thumb||p.img||''}" alt=""/></div>
     <div class="set-row"><button class="btn danger" onclick="removePhoto('${pid}')">Remove photo</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Photo');
   try{
@@ -1074,10 +1134,11 @@ async function viewPhoto(pid){
   }catch(e){}
 }
 function removePhoto(pid){
-  curEntry.photos=(curEntry.photos||[]).filter(x=>x.id!==pid);
+  const k=viewDate,dft=getDraft(k);
+  dft.photos=(dft.photos||[]).filter(x=>x.id!==pid);
   idbDeletePhoto(pid).catch(()=>{});
   deleteRemotePhoto(pid).catch(()=>{});
-  commitEntry();closeModal();renderToday(document.getElementById('view'));
+  commitDraft(k);closeModal();renderToday(document.getElementById('view'));
 }
 // Convert any legacy inline-base64 photos (stored in localStorage) into IDB blobs + thumbs.
 function thumbFromDataURL(dataURL){return new Promise(resolve=>{const im=new Image();im.onload=()=>{const th=scaleDims(im.width,im.height,200);resolve(drawToCanvas(im,th.w,th.h).toDataURL('image/jpeg',.5));};im.onerror=()=>resolve('');im.src=dataURL;});}
@@ -1154,20 +1215,21 @@ function videoThumbnail(file){
 async function addVideos(files){
   if(!files||!files.length||currentView!=='today')return;
   if(!window.indexedDB){alert('Video storage is not supported in this browser.');return;}
+  const k=viewDate,dft=getDraft(k);
   for(const f of Array.from(files)){
     if(f.size>MAX_VIDEO_BYTES){alert(`"${f.name}" is over 300MB — too large to add.`);continue;}
     try{
       const thumb=await videoThumbnail(f);
       const id=uid();
       await idbPutVideo(id,f);
-      curEntry.videos=curEntry.videos||[];
-      curEntry.videos.push({id,thumb:thumb||'',mime:f.type||'video/mp4',size:f.size,name:f.name||'video'});
+      dft.videos=dft.videos||[];
+      dft.videos.push({id,thumb:thumb||'',mime:f.type||'video/mp4',size:f.size,name:f.name||'video'});
     }catch(e){alert('Could not add that video: '+(e&&e.message?e.message:e));}
   }
-  commitEntry();renderToday(document.getElementById('view'));
+  commitDraft(k);renderToday(document.getElementById('view'));
 }
 function viewVideo(vid){
-  const v=(curEntry.videos||[]).find(x=>x.id===vid);if(!v)return;
+  const v=(getDraft(viewDate).videos||[]).find(x=>x.id===vid);if(!v)return;
   openModal(`<div class="video-full"><video controls autoplay playsinline id="video-player" style="width:100%;border-radius:4px;margin-bottom:14px;background:#000"></video></div>
     <div class="set-row"><button class="btn danger" onclick="removeVideo('${vid}')">Remove video</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Video');
   idbGetVideo(vid).then(blob=>{
@@ -1178,9 +1240,10 @@ function viewVideo(vid){
   }).catch(()=>{});
 }
 function removeVideo(vid){
-  curEntry.videos=(curEntry.videos||[]).filter(x=>x.id!==vid);
+  const k=viewDate,dft=getDraft(k);
+  dft.videos=(dft.videos||[]).filter(x=>x.id!==vid);
   idbDeleteVideo(vid).catch(()=>{});
-  commitEntry();closeModal();renderToday(document.getElementById('view'));
+  commitDraft(k);closeModal();renderToday(document.getElementById('view'));
 }
 
 // ── VOICE ──
@@ -1204,7 +1267,7 @@ function micStart(){
       if(r.isFinal)recBase=recBase.replace(/\s+$/,'')+(recBase.trim()?' ':'')+r[0].transcript.trim()+' ';
       else inter+=r[0].transcript;
     }
-    if(recEl){recEl.value=recBase+inter;onField(recEl);}
+    if(recEl){recEl.value=recBase+inter;recEl.dispatchEvent(new Event('input',{bubbles:true}));}
   };
   rec.onerror=ev=>{
     const x=ev.error;
@@ -1232,39 +1295,39 @@ function stopMic(){if(rec||micActive)stopMicManual();}
 function micFinish(){if(recBtn)recBtn.classList.remove('rec');rec=null;recBtn=null;recEl=null;micActive=false;}
 function micFail(msg){micFinish();alert(msg);}
 
-// ── ENTRIES (timeline) ──
+// ── ENTRIES (timeline + folded-in calendar) ──
+let entriesTab='list';
+function entriesHeader(count){
+  return `<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Entries</div><div class="section-sub">${count} ${count===1?'day':'days'} written</div></div>
+    <span class="sc-seg"><button class="${entriesTab==='list'?'on':''}" onclick="entriesTab='list';renderEntries(document.getElementById('view'))">List</button><button class="${entriesTab==='calendar'?'on':''}" onclick="entriesTab='calendar';renderEntries(document.getElementById('view'))">Calendar</button></span></div>`;
+}
 function renderEntries(el){
   const keys=liveEntryKeys().sort().reverse();
+  if(entriesTab==='calendar'){el.innerHTML=entriesHeader(keys.length)+calendarInner();return;}
   const all=getEntriesRaw();
   const q=searchQ.trim().toLowerCase();
   const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
-  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Entries</div><div class="section-sub">${keys.length} ${keys.length===1?'day':'days'} written</div></div></div>
-  <div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntries(document.getElementById('view'))"/></div>`;
+  let h=entriesHeader(keys.length)+`<div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntries(document.getElementById('view'))"/></div>`;
   if(!shown.length){h+=`<div class="empty-note">${q?'Nothing found for that search.':'No entries yet.<br/>Today is a good day to start.'}</div>`;}
   else h+=shown.map(k=>{
-    const e=all[k],d=parseKey(k),m=entryMood(e),sn=entrySnippet(e);
+    const e=all[k],d=parseKey(k),sn=entrySnippet(e),done=e.done;
     return `<div class="entry-card" onclick="openDay('${k}')">
-      <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${m?m.e+' ':''}${esc(fmtFull(d))}</span><span style="display:flex;align-items:center;gap:8px"><span class="ec-meta">${esc(templateById(e.t).name)}</span><button class="icon-btn" title="Delete entry" onclick="event.stopPropagation();deleteDay('${k}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
+      <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtFull(d))}</span><span style="display:flex;align-items:center;gap:8px">${done===true?'<span class="ec-done">✓ kept</span>':done===false?'<span class="ec-done miss">missed</span>':''}<button class="icon-btn" title="Delete entry" onclick="event.stopPropagation();deleteDay('${k}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
       ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
       ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.thumb||p.img||''}" alt=""/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt=""/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
     </div>`;}).join('');
   el.innerHTML=h;
 }
-
-// ── CALENDAR ──
-function renderCalendar(el){
+function calendarInner(){
   const now=new Date();
   if(calYear===null){calYear=now.getFullYear();calMonth=now.getMonth();}
   const y=calYear,m=calMonth;
   const keys=liveEntryKeys();
   const monthKeys=keys.filter(k=>k.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)).sort();
-  const all=getEntriesRaw();
-  // streak
   let streak=0;const d=new Date();
   if(!keys.includes(dkey(d)))d.setDate(d.getDate()-1);
   while(keys.includes(dkey(d))){streak++;d.setDate(d.getDate()-1);}
-  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Month</div></div></div>
-  <div class="cal-head">
+  let h=`<div class="cal-head">
     <button class="day-step" onclick="calStep(-1)">‹</button>
     <span class="cal-title" style="font-family:'Cormorant Garamond',serif">${esc(monthName(y,m))}</span>
     <button class="day-step" onclick="calStep(1)">›</button>
@@ -1279,8 +1342,7 @@ function renderCalendar(el){
   for(let day=1;day<=dim;day++){
     const k=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const has=monthKeys.includes(k);
-    const mo=has?entryMood(all[k]):null;
-    h+=`<button class="cal-cell in-month ${k===todayKey?'today':''}" onclick="openDay('${k}')">${mo?`<span class="m-mini">${mo.e}</span>`:''}${day}${has?'<span class="dot"></span>':'<span style="height:5px"></span>'}</button>`;
+    h+=`<button class="cal-cell in-month ${k===todayKey?'today':''}" onclick="openDay('${k}')">${day}${has?'<span class="dot"></span>':'<span style="height:5px"></span>'}</button>`;
   }
   h+=`</div>
   <div class="export-block"><div class="export-label">Export ${esc(monthName(y,m))}</div>
@@ -1289,20 +1351,19 @@ function renderCalendar(el){
     <button class="btn" onclick="printMonth(${y},${m})"><svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / PDF</button>
     <button class="btn" onclick="shareMonth(${y},${m})"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>Share text</button>
   </div></div>`;
-  el.innerHTML=h;
+  return h;
 }
-function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCalendar(document.getElementById('view'));}
+function calStep(n){calMonth+=n;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderEntries(document.getElementById('view'));}
 
 // ── HABIT SCORECARD (based on the Atomic Habits Habits Scorecard) ──
 let scDraft=null; // the in-progress rating run, or null when viewing the summary
-const SC_SEED=['Woke up at a good time','Made my bed','Checked my phone first thing','Ate a healthy breakfast','Moved my body / exercised','Drank enough water','Ate well through the day','Mindless scrolling','Time outdoors','Read or learned something','Alcohol / junk food','Went to bed on time'];
 function scorecardData(){return Object.assign({habits:[],cards:[],cadence:'week'},userData('scorecard',{}));}
 function saveScorecard(patch){const s=Object.assign(scorecardData(),patch);s.updated=Date.now();saveData('scorecard',s);}
-function ensureScorecardSeeded(){if(userData('scorecard',null))return;saveScorecard({habits:SC_SEED.map(l=>({id:uid(),label:l})),cards:[],cadence:'week'});}
+function ensureScorecardSeeded(){if(userData('scorecard',null))return;saveScorecard({habits:[],cards:[],cadence:'week'});}
 function refreshScorecard(){renderScorecard(document.getElementById('view'));}
 function isoWeekKey(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day+3);const firstThu=new Date(dt.getFullYear(),0,4);const wk=1+Math.round(((dt-firstThu)/86400000-3+((firstThu.getDay()+6)%7))/7);return dt.getFullYear()+'-W'+String(wk).padStart(2,'0');}
-function scPeriodKey(dateStr,cadence){if(cadence==='month')return dateStr.slice(0,7);if(cadence==='week')return isoWeekKey(parseKey(dateStr));return dateStr+'|'+Math.random();}
-function scPeriodLabel(cadence){return cadence==='month'?'this month':cadence==='week'?'this week':'';}
+function scPeriodKey(dateStr,cadence){if(cadence==='day')return dateStr;if(cadence==='month')return dateStr.slice(0,7);if(cadence==='week')return isoWeekKey(parseKey(dateStr));return dateStr+'|'+Math.random();}
+function scPeriodLabel(cadence){return cadence==='day'?'today':cadence==='month'?'this month':cadence==='week'?'this week':'';}
 function scoreCard(card){let g=0,n=0,b=0;const r=(card&&card.ratings)||{};Object.values(r).forEach(v=>{if(v==='+')g++;else if(v==='-')b++;else if(v==='=')n++;});return {good:g,neutral:n,bad:b,net:g-b,rated:g+n+b};}
 function scCardsSorted(){return (scorecardData().cards||[]).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:(b.at||0)-(a.at||0)));}
 function scCurrentPeriodCard(){const d=scorecardData();if(d.cadence==='none')return null;const pk=scPeriodKey(dkey(new Date()),d.cadence);return (d.cards||[]).find(c=>scPeriodKey(c.date,d.cadence)===pk)||null;}
@@ -1333,12 +1394,13 @@ function renderScorecard(el){
   }
   h+=`<div class="sc-cadence"><span class="lbl">Do this</span>
     <span class="sc-seg">
+      <button class="${d.cadence==='day'?'on':''}" onclick="setScCadence('day')">Daily</button>
       <button class="${d.cadence==='week'?'on':''}" onclick="setScCadence('week')">Weekly</button>
       <button class="${d.cadence==='month'?'on':''}" onclick="setScCadence('month')">Monthly</button>
       <button class="${d.cadence==='none'?'on':''}" onclick="setScCadence('none')">Off</button>
     </span></div>`;
   const cur=scCurrentPeriodCard(),periodLbl=scPeriodLabel(d.cadence);
-  const startLabel=cur?`Update ${periodLbl?periodLbl+'’s':'your'} scorecard`:(periodLbl?`Start ${periodLbl}’s scorecard`:'New scorecard');
+  const startLabel=cur?(periodLbl==='today'?'Update today’s scorecard':`Update ${periodLbl?periodLbl+'’s':'your'} scorecard`):(periodLbl==='today'?'Start today’s scorecard':periodLbl?`Start ${periodLbl}’s scorecard`:'New scorecard');
   h+=`<button class="btn primary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="startScorecard(${cur?`'${cur.id}'`:''})">${startLabel}</button>
     <button class="btn" style="width:100%;justify-content:center" onclick="openHabitsManager()">Manage my habits (${(d.habits||[]).length})</button>`;
   if(cards.length){
@@ -1436,6 +1498,70 @@ function scAddHabitFromModal(){
   addHabit(v);openHabitsManager();
 }
 
+// ── GRAPHS (progress over time; line charts) ──
+let graphPeriod='weekly'; // weekly | monthly | yearly
+function weekMonday(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);return dkey(dt);}
+function bucketKey(dateStr,period){const d=parseKey(dateStr);if(period==='yearly')return String(d.getFullYear());if(period==='monthly')return dateStr.slice(0,7);return weekMonday(d);}
+function bucketLabel(key,period){if(period==='yearly')return key;if(period==='monthly'){const p=key.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short'});}const d=parseKey(key);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function scoreSeries(period){
+  const cards=scorecardData().cards||[];
+  const buckets={};
+  cards.forEach(c=>{const key=bucketKey(c.date,period);(buckets[key]=buckets[key]||[]).push(scoreCard(c).net);});
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:Math.round((buckets[k].reduce((a,b)=>a+b,0)/buckets[k].length)*10)/10})).slice(-12);
+}
+function intentionSeries(period){
+  const all=getEntriesRaw();const buckets={};
+  Object.keys(all).forEach(k=>{const e=all[k];if(!e||e.deleted)return;if(e.done!==true&&e.done!==false)return;const key=bucketKey(k,period);const b=(buckets[key]=buckets[key]||{t:0,n:0});if(e.done===true)b.t++;b.n++;});
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:Math.round((buckets[k].t/buckets[k].n)*100)})).slice(-12);
+}
+// Inline SVG line chart. points=[{label,value}]; opts {min,max,suffix}
+function lineChartSVG(points,opts){
+  opts=opts||{};
+  if(!points.length)return '<div class="empty-note" style="padding:28px 10px">Not enough data yet — it fills in as you go.</div>';
+  const W=320,H=180,padL=30,padR=10,padT=12,padB=30;
+  const vals=points.map(p=>p.value);
+  let min=opts.min!==undefined?opts.min:Math.min(...vals);
+  let max=opts.max!==undefined?opts.max:Math.max(...vals);
+  if(min===max){min-=1;max+=1;}
+  const plotW=W-padL-padR,plotH=H-padT-padB;
+  const x=i=>padL+(points.length===1?plotW/2:(i/(points.length-1))*plotW);
+  const y=v=>padT+plotH-((v-min)/(max-min))*plotH;
+  const suffix=opts.suffix||'';
+  let grid='',i;
+  for(i=0;i<=2;i++){const gv=min+(max-min)*(i/2);const gy=y(gv);grid+=`<line class="grid" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/><text class="yl" x="${padL-4}" y="${gy+3}" text-anchor="end">${Math.round(gv*10)/10}${suffix}</text>`;}
+  if(min<0&&max>0){const z=y(0);grid+=`<line class="zero" x1="${padL}" y1="${z}" x2="${W-padR}" y2="${z}"/>`;}
+  const line=points.map((p,idx)=>`${x(idx)},${y(p.value)}`).join(' ');
+  const dots=points.map((p,idx)=>`<circle class="dot" cx="${x(idx)}" cy="${y(p.value)}" r="3"/>`).join('');
+  const n=points.length;
+  const xlabels=points.map((p,idx)=>{if(n>6&&idx%Math.ceil(n/6)!==0&&idx!==n-1)return '';return `<text class="xl" x="${x(idx)}" y="${H-10}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${grid}<polyline class="ln" points="${line}"/>${dots}${xlabels}</svg>`;
+}
+function setGraphPeriod(p){graphPeriod=p;renderGraphs(document.getElementById('view'));}
+function renderGraphs(el){
+  const scoreP=scoreSeries(graphPeriod);
+  const intentP=intentionSeries(graphPeriod);
+  const scVals=scoreP.map(p=>p.value);
+  const scMin=scVals.length?Math.min(0,...scVals):0,scMax=scVals.length?Math.max(0,...scVals):1;
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Graphs</div><div class="section-sub">Your progress over time.</div></div></div>
+  <div class="sc-cadence"><span class="lbl">Group by</span>
+    <span class="sc-seg">
+      <button class="${graphPeriod==='weekly'?'on':''}" onclick="setGraphPeriod('weekly')">Weekly</button>
+      <button class="${graphPeriod==='monthly'?'on':''}" onclick="setGraphPeriod('monthly')">Monthly</button>
+      <button class="${graphPeriod==='yearly'?'on':''}" onclick="setGraphPeriod('yearly')">Yearly</button>
+    </span></div>
+  <div class="graph-card">
+    <div class="graph-title">Scorecard score</div>
+    <div class="graph-sub">Average of your habit scorecards${scoreP.length?'':' — do a scorecard to start the line'}</div>
+    ${lineChartSVG(scoreP,{min:scMin,max:scMax})}
+  </div>
+  <div class="graph-card">
+    <div class="graph-title">Kept my one thing</div>
+    <div class="graph-sub">How often you did the one thing you set${intentP.length?'':' — mark your intention done or not to start the line'}</div>
+    ${lineChartSVG(intentP,{min:0,max:100,suffix:'%'})}
+  </div>`;
+  el.innerHTML=h;
+}
+
 // ── STARS / REWARDS (beta — visible only to emails in STARS_BETA_EMAILS above) ──
 function starsAllowed(){return !!currentUserEmail&&STARS_BETA_EMAILS.map(x=>x.toLowerCase()).includes(String(currentUserEmail).toLowerCase());}
 // The FAB lives in the static shell (outside #view) so it survives every view's
@@ -1445,6 +1571,7 @@ function updateStarsFab(){
   if(btn)btn.style.display=(starsAllowed()&&currentView!=='rewards')?'flex':'none';
 }
 function starsData(){return Object.assign({balance:0,log:[],earnActivities:[],spendRewards:[]},userData('stars',{}));}
+function starsEarnedOn(dateKey){const start=parseKey(dateKey).getTime(),end=start+86400000;return (starsData().log||[]).filter(l=>l.type==='earn'&&l.at>=start&&l.at<end).reduce((a,l)=>a+(l.stars||0),0);}
 function saveStars(patch){const s=Object.assign(starsData(),patch);s.updated=Date.now();saveData('stars',s);}
 // Auto-scaling slider max: rounds up to a "nice" number a bit above the current balance.
 function starsMax(bal){
@@ -1650,19 +1777,17 @@ function deleteStarsItem(kind,id){
 // ── EXPORT / SHARE ──
 function dayText(k){
   const e=getEntry(k);if(!e)return '';
-  const d=parseKey(k),tpl=templateById(e.t);
+  const d=parseKey(k),v=e.v||{};
   let out=fmtFull(d).toUpperCase()+'\n';
-  tpl.fields.forEach(f=>{
-    const v=e.v[f.id];
-    if(f.type==='mood'){const m=MOODS.find(x=>x.v===v);if(m)out+=`\n${f.label}: ${m.l} ${m.e}\n`;return;}
-    if(Array.isArray(v)){const items=v.map((x,i)=>String(x||'').trim()?`${i+1}. ${x.trim()}`:'').filter(Boolean);if(items.length)out+=`\n${f.label.toUpperCase()}\n${items.join('\n')}\n`;return;}
-    if(String(v||'').trim())out+=`\n${f.label.toUpperCase()}\n${v.trim()}\n`;
-  });
+  const g=goodArr(e).map((x,i)=>String(x||'').trim()?`${i+1}. ${x.trim()}`:'').filter(Boolean);
+  if(g.length)out+=`\nTHREE GOOD THINGS\n${g.join('\n')}\n`;
+  if(String(v.intention||'').trim())out+=`\nONE THING I WILL DO\n${v.intention.trim()}${e.done===true?'  (done ✓)':e.done===false?'  (not done)':''}\n`;
+  if(String(v.notes||'').trim())out+=`\nABOUT TODAY\n${v.notes.trim()}\n`;
   return out;
 }
 function dataURLtoBlob(u){const p=u.split(',');const m=p[0].match(/:(.*?);/)[1];const b=atob(p[1]);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:m});}
 async function shareDay(k){
-  flushEntry();
+  flushDrafts();
   const e=getEntry(k);
   if(!e){alert('Nothing written for this day yet.');return;}
   const text=dayText(k),title='Daybook — '+fmtLong(parseKey(k));
@@ -1688,14 +1813,12 @@ async function photoDataURL(p){
 }
 async function entryHTML(k){
   const e=getEntry(k);if(!e)return '';
-  const d=parseKey(k),tpl=templateById(e.t),m=entryMood(e);
-  let h=`<article><h2>${m?m.e+' ':''}${esc(fmtFull(d))}</h2>`;
-  tpl.fields.forEach(f=>{
-    const v=e.v[f.id];
-    if(f.type==='mood')return;
-    if(Array.isArray(v)){const items=v.filter(x=>String(x||'').trim());if(items.length)h+=`<h3>${esc(f.label)}</h3><ol>${items.map(x=>`<li>${esc(x.trim())}</li>`).join('')}</ol>`;return;}
-    if(String(v||'').trim())h+=`<h3>${esc(f.label)}</h3><p>${esc(v.trim()).replace(/\n/g,'<br/>')}</p>`;
-  });
+  const d=parseKey(k),v=e.v||{};
+  let h=`<article><h2>${esc(fmtFull(d))}</h2>`;
+  const g=goodArr(e).filter(x=>String(x||'').trim());
+  if(g.length)h+=`<h3>Three good things</h3><ol>${g.map(x=>`<li>${esc(x.trim())}</li>`).join('')}</ol>`;
+  if(String(v.intention||'').trim())h+=`<h3>One thing I will do</h3><p>${esc(v.intention.trim())}${e.done===true?' — <b>done ✓</b>':e.done===false?' — not done':''}</p>`;
+  if(String(v.notes||'').trim())h+=`<h3>About today</h3><p>${esc(v.notes.trim()).replace(/\n/g,'<br/>')}</p>`;
   if((e.photos||[]).length){
     const urls=await Promise.all(e.photos.map(photoDataURL));
     const imgs=urls.filter(Boolean).map(u=>`<img src="${u}"/>`).join('');
@@ -1731,7 +1854,7 @@ function download(name,content,type){
   setTimeout(()=>URL.revokeObjectURL(a.href),5000);
 }
 async function downloadDay(k){
-  flushEntry();
+  flushDrafts();
   if(!getEntry(k)){alert('Nothing written for this day yet.');return;}
   download(`daybook-${k}.html`,await exportDoc([k],fmtFull(parseKey(k))),'text/html');
 }
@@ -1861,14 +1984,6 @@ function renderSettings(el){
     ${(!permOk&&!permDenied)?`<div class="set-row"><button class="btn primary" onclick="requestNotifPermission()">Enable notifications</button></div>`:''}
     ${remRows}
     <div style="margin-top:12px"><button class="btn" onclick="editReminder(null)">+ Add a reminder</button></div>`;
-  const tplRows=getTemplates().map(t=>`<div class="tpl-list-item">
-      <span class="tli-name">${esc(t.name)}${t.builtin?'<span class="tli-tag">Built-in</span>':''}${t.id===s.defaultTemplate?'<span class="tli-tag" style="color:var(--accent);border-color:var(--accent)">Default</span>':''}</span>
-      <span class="tli-actions">
-        ${t.id!==s.defaultTemplate?`<button class="icon-btn" title="Make default" onclick="saveSettings({defaultTemplate:'${t.id}'});showView('settings')"><svg viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1Z"/></svg></button>`:''}
-        ${t.builtin?`<button class="icon-btn" title="Duplicate & edit" onclick="duplicateTpl('${t.id}')"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`
-        :`<button class="icon-btn" title="Edit" onclick="editTpl('${t.id}')"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-          <button class="icon-btn" title="Delete" onclick="deleteTpl('${t.id}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`}
-      </span></div>`).join('');
   el.innerHTML=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Style</div><div class="section-sub">Make it yours</div></div></div>
 
   <div class="set-block"><div class="set-label">Theme</div>
@@ -1896,10 +2011,6 @@ function renderSettings(el){
     <div class="size-row">${[['s','Small'],['m','Medium'],['l','Large'],['xl','Extra']].map(([id,n])=>`<button class="size-opt ${s.size===id?'on':''}" onclick="saveSettings({size:'${id}'});showView('settings')">${n}</button>`).join('')}</div>
   </div>
 
-  <div class="set-block"><div class="set-label">Daily templates</div>
-    ${tplRows}
-    <div style="margin-top:12px"><button class="btn" onclick="editTpl(null)">+ Design your own</button></div>
-  </div>
 
   <div class="set-block"><div class="set-label">Reminders</div>${remindersBlock}</div>
 
@@ -1921,66 +2032,6 @@ function renderSettings(el){
   </div>`;
 }
 function setCustomColor(k,val){const s=settingsData();const c=Object.assign({},s.custom);c[k]=val;saveSettings({custom:c});showView('settings');}
-
-// ── TEMPLATE BUILDER ──
-function editTpl(id){
-  if(id){const t=customTemplates().find(x=>x.id===id);if(!t)return;editingTpl=JSON.parse(JSON.stringify(t));}
-  else editingTpl={id:'c'+uid(),name:'',fields:[{id:uid(),type:'long',label:'How was today?'}],created:Date.now()};
-  renderTplModal();
-}
-function duplicateTpl(id){
-  const t=templateById(id);
-  editingTpl=JSON.parse(JSON.stringify(t));
-  editingTpl.id='c'+uid();editingTpl.name=t.name+' (mine)';delete editingTpl.builtin;editingTpl.created=Date.now();
-  editingTpl.fields.forEach(f=>f.id=uid());
-  renderTplModal();
-}
-function renderTplModal(){
-  const t=editingTpl;
-  const typeOpts=[['text','Short answer'],['long','Long text'],['list','Numbered list'],['mood','Mood']];
-  const body=`<div class="tb-name"><input placeholder="Template name (e.g. Evening Reflection)" value="${esc(t.name)}" oninput="editingTpl.name=this.value"/></div>
-  ${t.fields.map((f,i)=>`<div class="tb-field">
-    <div class="tb-field-top"><input placeholder="Question or prompt…" value="${esc(f.label)}" oninput="editingTpl.fields[${i}].label=this.value"/></div>
-    <div class="tb-field-bottom">
-      <select onchange="tbType(${i},this.value)">${typeOpts.map(([v,n])=>`<option value="${v}" ${f.type===v?'selected':''}>${n}</option>`).join('')}</select>
-      ${f.type==='list'?`<select onchange="editingTpl.fields[${i}].count=Number(this.value);renderTplModal()">${[2,3,4,5].map(n=>`<option ${f.count===n?'selected':''}>${n}</option>`).join('')}</select><span style="font-size:.72rem;color:var(--muted);font-style:italic">items</span>`:''}
-      <span style="flex:1"></span>
-      ${i>0?`<button class="icon-btn" onclick="tbMove(${i},-1)" title="Move up"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>`:''}
-      ${i<t.fields.length-1?`<button class="icon-btn" onclick="tbMove(${i},1)" title="Move down"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>`:''}
-      <button class="icon-btn" onclick="tbRemove(${i})" title="Remove"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-    </div></div>`).join('')}
-  <button class="btn small" onclick="tbAdd()">+ Add a question</button>
-  <div class="tb-actions">
-    <button class="btn primary" onclick="saveTpl()">Save template</button>
-    <button class="btn" onclick="closeModal()">Cancel</button>
-  </div>`;
-  openModal(body,editingTpl.name?'Edit template':'New template');
-}
-function tbType(i,v){editingTpl.fields[i].type=v;if(v==='list'&&!editingTpl.fields[i].count)editingTpl.fields[i].count=3;renderTplModal();}
-function tbAdd(){editingTpl.fields.push({id:uid(),type:'text',label:''});renderTplModal();}
-function tbRemove(i){editingTpl.fields.splice(i,1);renderTplModal();}
-function tbMove(i,n){const f=editingTpl.fields;const x=f.splice(i,1)[0];f.splice(i+n,0,x);renderTplModal();}
-function saveTpl(){
-  const t=editingTpl;
-  t.name=(t.name||'').trim()||'My template';
-  t.fields=t.fields.filter(f=>(f.label||'').trim());
-  if(!t.fields.length){alert('Add at least one question with a label.');return;}
-  const all=userData('templates',[]);
-  const idx=all.findIndex(x=>x.id===t.id);
-  t.updated=Date.now();
-  if(idx>=0)all[idx]=t;else all.push(t);
-  saveData('templates',all);
-  editingTpl=null;closeModal();showView('settings');
-}
-function deleteTpl(id){
-  if(!confirm('Delete this template? Entries written with it keep their text.'))return;
-  const all=userData('templates',[]);
-  const idx=all.findIndex(x=>x.id===id);
-  if(idx>=0){all[idx]={id,deleted:true,updated:Date.now()};saveData('templates',all);}
-  const s=settingsData();
-  if(s.defaultTemplate===id)saveSettings({defaultTemplate:'tgt'});
-  showView('settings');
-}
 
 // ── MODAL ──
 function openModal(body,title){
