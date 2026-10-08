@@ -1518,7 +1518,7 @@ function scAddHabitFromModal(){
 // ── GRAPHS (progress over time; line charts) ──
 let graphPeriod='weekly'; // weekly | monthly | yearly
 function weekMonday(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);return dkey(dt);}
-function bucketKey(dateStr,period){const d=parseKey(dateStr);if(period==='yearly')return String(d.getFullYear());if(period==='monthly')return dateStr.slice(0,7);return weekMonday(d);}
+function bucketKey(dateStr,period){const d=parseKey(dateStr);if(period==='daily')return dateStr;if(period==='yearly')return String(d.getFullYear());if(period==='monthly')return dateStr.slice(0,7);return weekMonday(d);}
 function bucketLabel(key,period){if(period==='yearly')return key;if(period==='monthly'){const p=key.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short'});}const d=parseKey(key);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
 function scoreSeries(period){
   const cards=scorecardData().cards||[];
@@ -1553,15 +1553,23 @@ function lineChartSVG(points,opts){
   const xlabels=points.map((p,idx)=>{if(n>6&&idx%Math.ceil(n/6)!==0&&idx!==n-1)return '';return `<text class="xl" x="${x(idx)}" y="${H-10}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${grid}<polyline class="ln" points="${line}"/>${dots}${xlabels}</svg>`;
 }
+function starsSeries(period){
+  const log=(starsData().log||[]).filter(l=>l.type==='earn');
+  const buckets={};
+  log.forEach(l=>{if(!l.at)return;const key=bucketKey(dkey(new Date(l.at)),period);buckets[key]=(buckets[key]||0)+(l.stars||0);});
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:buckets[k]})).slice(-12);
+}
 function setGraphPeriod(p){graphPeriod=p;renderGraphs(document.getElementById('view'));}
 function renderGraphs(el){
   const scoreP=scoreSeries(graphPeriod);
   const intentP=intentionSeries(graphPeriod);
   const scVals=scoreP.map(p=>p.value);
   const scMin=scVals.length?Math.min(0,...scVals):0,scMax=scVals.length?Math.max(0,...scVals):1;
+  const grp=graphPeriod==='daily'?'day':graphPeriod==='monthly'?'month':graphPeriod==='yearly'?'year':'week';
   let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Graphs</div><div class="section-sub">Your progress over time.</div></div></div>
   <div class="sc-cadence"><span class="lbl">Group by</span>
     <span class="sc-seg">
+      <button class="${graphPeriod==='daily'?'on':''}" onclick="setGraphPeriod('daily')">Daily</button>
       <button class="${graphPeriod==='weekly'?'on':''}" onclick="setGraphPeriod('weekly')">Weekly</button>
       <button class="${graphPeriod==='monthly'?'on':''}" onclick="setGraphPeriod('monthly')">Monthly</button>
       <button class="${graphPeriod==='yearly'?'on':''}" onclick="setGraphPeriod('yearly')">Yearly</button>
@@ -1576,6 +1584,14 @@ function renderGraphs(el){
     <div class="graph-sub">How often you did the one thing you set${intentP.length?'':' — mark your intention done or not to start the line'}</div>
     ${lineChartSVG(intentP,{min:0,max:100,suffix:'%'})}
   </div>`;
+  if(starsAllowed()){
+    const starsP=starsSeries(graphPeriod);
+    h+=`<div class="graph-card">
+    <div class="graph-title">Stars earned</div>
+    <div class="graph-sub">Stars earned per ${grp}${starsP.length?'':' — earn some stars to start the line'}</div>
+    ${lineChartSVG(starsP,{min:0})}
+  </div>`;
+  }
   el.innerHTML=h;
 }
 
