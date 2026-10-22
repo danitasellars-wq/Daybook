@@ -173,7 +173,7 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 .signed-in-as{font-size:.9rem;margin-bottom:12px;line-height:1.5}
 
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(20,14,8,.5);backdrop-filter:blur(6px);z-index:500;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal-overlay{position:fixed;inset:0;background:rgba(20,14,8,.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:14px}
 .modal-box{background:var(--bg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:26px 24px;border-top:3px solid var(--ink);border-radius:0 0 6px 6px;animation:modalIn .2s ease}
 @keyframes modalIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
@@ -523,7 +523,7 @@ function enterApp(sub,email,name){
   setupFileInputs();
   showView('today');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
-  migrateInlinePhotos().then(changed=>{if(changed){clearDraftCache();showView(currentView);}}).catch(()=>{});
+  migrateInlinePhotos().then(changed=>{if(changed)refreshView(true);}).catch(()=>{});
   setupReminderSW();
   mirrorReminders(settingsData());
   setInterval(checkDueRemindersForeground,60000);
@@ -647,7 +647,7 @@ async function pullAndMerge(){
   const pushNeeded=mStr!==JSON.stringify({e:rE,t:rT,s:rS,st:rSt,sc:rSc});
   if(localChanged){
     setStore(userKey('entries'),mE);setStore(userKey('templates'),mT);setStore(userKey('settings'),mS);setStore(userKey('stars'),mSt);setStore(userKey('scorecard'),mSc);
-    applyAppearance();mirrorReminders(mS);clearDraftCache();showView(currentView);
+    applyAppearance();mirrorReminders(mS);refreshView(true);
   }
   const migrated=await migrateInlinePhotos();
   return (pushNeeded||migrated)?'pushneeded':'insync';
@@ -702,10 +702,11 @@ async function syncPhotoFiles(){
     const remote=await listRemotePhotos();
     const auth={headers:{Authorization:'Bearer '+driveAccessToken}};
     // Pull: referenced photos we don't have locally yet
+    let pulled=false;
     for(const id of ids){
       const fn=photoFileName(id);
       if(remote[fn]&&!(await idbGetPhoto(id))){
-        try{const blob=await (await driveFetch(`https://www.googleapis.com/drive/v3/files/${remote[fn]}?alt=media`,auth)).blob();await idbPutPhoto(id,blob);}catch(e){}
+        try{const blob=await (await driveFetch(`https://www.googleapis.com/drive/v3/files/${remote[fn]}?alt=media`,auth)).blob();await idbPutPhoto(id,blob);pulled=true;}catch(e){}
       }
     }
     // Push: referenced photos not on Drive yet
@@ -715,7 +716,7 @@ async function syncPhotoFiles(){
         if(blob){try{await uploadAppDataPhoto(id,blob);}catch(e){}}
       }
     }
-    if(currentView==='today'||currentView==='entries')showView(currentView);
+    if(pulled&&(currentView==='today'||currentView==='entries'))refreshView(false);   // only when photos actually arrived
   }finally{photoSyncRunning=false;}
 }
 async function ensurePhotoLocal(id){
@@ -992,6 +993,21 @@ function getDraft(k){if(!drafts[k]){const e=getEntry(k);drafts[k]=e?JSON.parse(J
 function markSaveStatus(t){const st=document.getElementById('save-status');if(st)st.textContent=t;}
 function saveDraftSoon(k){markSaveStatus('writing…');if(dsaveTimers[k])clearTimeout(dsaveTimers[k]);dsaveTimers[k]=setTimeout(()=>commitDraft(k),600);}
 function commitDraft(k){const dft=drafts[k];if(!dft)return;if(dsaveTimers[k]){clearTimeout(dsaveTimers[k]);delete dsaveTimers[k];}if(entryHasContent(dft))putEntry(k,dft);markSaveStatus('saved ✓');}
+// Background refreshes (a sync finishing, photos arriving) must never rebuild the screen while you are typing: that removes the box
+// you are typing in and closes the phone keyboard. They wait until you leave the field, then run.
+let pendingRefresh=false,pendingRefreshClear=false;
+function userIsTyping(){
+  const a=document.activeElement;if(!a)return false;
+  if(a.tagName==='TEXTAREA'||a.tagName==='SELECT')return true;
+  return a.tagName==='INPUT'&&!/^(checkbox|radio|button|submit|range|color|file)$/.test(a.type);
+}
+function refreshView(clearDrafts){
+  if(userIsTyping()){pendingRefresh=true;pendingRefreshClear=pendingRefreshClear||!!clearDrafts;return;}
+  const clr=clearDrafts||pendingRefreshClear;pendingRefresh=false;pendingRefreshClear=false;
+  if(clr){flushDrafts();}
+  showView(currentView);
+}
+document.addEventListener('focusout',()=>{if(!pendingRefresh)return;setTimeout(()=>{if(pendingRefresh&&!userIsTyping())refreshView(false);},400);});
 function flushDrafts(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};Object.keys(drafts).forEach(k=>{if(entryHasContent(drafts[k]))putEntry(k,drafts[k]);});drafts={};}
 function clearDraftCache(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};drafts={};}
 function autogrow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';}
@@ -1319,7 +1335,17 @@ function renderEntries(el){
   const all=getEntriesRaw();
   const q=searchQ.trim().toLowerCase();
   const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
-  let h=entriesHeader(keys.length)+`<div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntries(document.getElementById('view'))"/></div>`;
+  // The search box stays in place while you type; only the results underneath are redrawn (redrawing the box closed the phone keyboard).
+  el.innerHTML=entriesHeader(keys.length)+`<div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntryResults()"/></div><div id="entries-results">${entryResultsHTML(shown,all,q)}</div>`;
+}
+function renderEntryResults(){
+  const box=document.getElementById('entries-results');if(!box)return;
+  const all=getEntriesRaw(),keys=liveEntryKeys().sort().reverse(),q=searchQ.trim().toLowerCase();
+  const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
+  box.innerHTML=entryResultsHTML(shown,all,q);
+}
+function entryResultsHTML(shown,all,q){
+  let h='';
   if(!shown.length){h+=`<div class="empty-note">${q?'Nothing found for that search.':'No entries yet.<br/>Today is a good day to start.'}</div>`;}
   else h+=shown.map(k=>{
     const e=all[k],d=parseKey(k),sn=entrySnippet(e),done=e.done;
@@ -1328,7 +1354,7 @@ function renderEntries(el){
       ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
       ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.thumb||p.img||''}" alt=""/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt=""/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
     </div>`;}).join('');
-  el.innerHTML=h;
+  return h;
 }
 function calendarInner(){
   const now=new Date();
