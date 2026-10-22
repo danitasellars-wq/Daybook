@@ -1010,7 +1010,14 @@ function refreshView(clearDrafts){
 document.addEventListener('focusout',()=>{if(!pendingRefresh)return;setTimeout(()=>{if(pendingRefresh&&!userIsTyping())refreshView(false);},400);});
 function flushDrafts(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};Object.keys(drafts).forEach(k=>{if(entryHasContent(drafts[k]))putEntry(k,drafts[k]);});drafts={};}
 function clearDraftCache(){Object.keys(dsaveTimers).forEach(k=>clearTimeout(dsaveTimers[k]));dsaveTimers={};drafts={};}
-function autogrow(t){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';}
+// Resize a writing box to fit its text. It used to collapse to 'auto' and re-measure on EVERY keystroke, which makes the box jump each time
+// a line wraps at the right edge and can close the phone keyboard. Now it only grows when the text no longer fits, and only re-measures
+// (shrinks) when text has been deleted.
+function autogrow(t){
+  const len=t.value.length,prev=t._agLen==null?-1:t._agLen;t._agLen=len;
+  if(!t.style.height||len<prev){t.style.height='auto';t.style.height=(t.scrollHeight+2)+'px';return;}
+  if(t.scrollHeight>t.clientHeight)t.style.height=(t.scrollHeight+2)+'px';
+}
 function micBtn(){return SR?`<button class="mic" onclick="toggleMic(this)" title="Dictate">${MIC_SVG}</button>`:'';}
 function jGood(k,i,el){const dft=getDraft(k);const arr=goodArr(dft).slice();arr[i]=el.value;dft.v.good=arr;saveDraftSoon(k);}
 function jText(k,field,el){const dft=getDraft(k);dft.v[field]=el.value;if(el.tagName==='TEXTAREA')autogrow(el);saveDraftSoon(k);}
