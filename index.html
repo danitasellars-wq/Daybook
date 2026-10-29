@@ -326,6 +326,15 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .ec-done{font-size:.64rem;font-weight:600;letter-spacing:.02em;color:#2a7a4a;border:1px solid #2a7a4a;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .ec-done.miss{color:var(--muted);border-color:var(--line)}
 /* ===== GRAPHS ===== */
+.hl-status{font-size:.78rem;color:var(--muted);margin:-4px 0 6px}
+.hl-status a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.hl-err{font-size:.8rem;color:var(--danger,#b4462f);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.4}
+.hl-day{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-family:var(--serif);font-size:1.15rem;font-weight:700}
+.hl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.hl-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;min-width:0}
+.hl-tile .l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.hl-tile .v{font-family:var(--serif);font-size:1.4rem;font-weight:700;line-height:1.15}
+.hl-tile .s{font-size:.72rem;color:var(--muted);margin-top:3px}
 .graph-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 14px 10px;margin-bottom:18px}
 .graph-title{font-family:var(--serif);font-size:1.25rem;font-weight:700;margin-bottom:2px}
 .graph-sub{font-size:.8rem;color:var(--muted);margin-bottom:10px;line-height:1.4}
@@ -559,7 +568,7 @@ function enterApp(sub,email,name){
   viewDate=dkey(new Date());
   document.getElementById('header-date').textContent=fmtLong(new Date());
   setupFileInputs();
-  showView('today');
+  showView(healthReturn?'health':'today');
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   migrateInlinePhotos().then(changed=>{if(changed)refreshView(true);}).catch(()=>{});
   setupReminderSW();
@@ -575,6 +584,7 @@ function signOut(){
 window.addEventListener('load',()=>{
   checkDriveRedirect();
   checkBkDriveRedirect();
+  checkHealthRedirect();
   try{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
@@ -1013,10 +1023,10 @@ function deleteReminder(id){
 // Two-section nav: the journal section (Journal/Entries/Style) and the star/tracking
 // section (Scorecard/Graphs/Workouts). Which section shows is derived from the view —
 // the ★ opens the star section, and the DAYBOOK brand goes to Journal (the journal section).
-const STAR_VIEWS=['scorecard','graphs','workouts','rewards'];
+const STAR_VIEWS=['scorecard','graphs','health','workouts','rewards'];
 const ICO_GEAR='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>';
 const NAV_JOURNAL=[['today','Journal','<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'],['entries','Entries','<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20v-2.5"/></svg>'],['settings','Style',ICO_GEAR]];
-const NAV_STAR=[['scorecard','Scorecard','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>'],['graphs','Graphs','<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>'],['workouts','Workouts','<svg viewBox="0 0 24 24"><path d="M6.5 7v10M4 9.5v5M17.5 7v10M20 9.5v5M6.5 12h11"/></svg>']];
+const NAV_STAR=[['scorecard','Scorecard','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>'],['graphs','Graphs','<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>'],['health','Health','<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h4l2-3 3 6 2-3h6"/></svg>'],['workouts','Workouts','<svg viewBox="0 0 24 24"><path d="M6.5 7v10M4 9.5v5M17.5 7v10M20 9.5v5M6.5 12h11"/></svg>']];
 function renderBottomNav(){
   const set=STAR_VIEWS.includes(currentView)?NAV_STAR:NAV_JOURNAL;
   const nav=document.getElementById('bottom-nav');if(!nav)return;
@@ -1040,10 +1050,12 @@ function showView(v){
   else if(v==='graphs')renderGraphs(el);
   else if(v==='scorecard')renderScorecard(el);
   else if(v==='workouts')renderWorkouts(el);
+  else if(v==='health')renderHealth(el);
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
   renderBottomNav();updateStarsFab();updateScorecardDue();updateHeader();
   window.scrollTo(0,0);
+  if(v==='health')healthOnOpen();
 }
 
 // ── JOURNAL (time-aware home + full day editor; fixed daily structure) ──
@@ -1653,12 +1665,13 @@ function lineChartSVG(points,opts){
   const y=v=>padT+plotH-((v-min)/(max-min))*plotH;
   const suffix=opts.suffix||'';
   let grid='',i;
-  for(i=0;i<=2;i++){const gv=min+(max-min)*(i/2);const gy=y(gv);grid+=`<line class="grid" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/><text class="yl" x="${padL-4}" y="${gy+3}" text-anchor="end">${Math.round(gv*10)/10}${suffix}</text>`;}
+  for(i=0;i<=2;i++){const gv=min+(max-min)*(i/2);const gy=y(gv);grid+=`<line class="grid" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/><text class="yl" x="${padL-4}" y="${gy+3}" text-anchor="end">${Math.abs(max-min)>=20?Math.round(gv):Math.round(gv*10)/10}${suffix}</text>`;}
   if(min<0&&max>0){const z=y(0);grid+=`<line class="zero" x1="${padL}" y1="${z}" x2="${W-padR}" y2="${z}"/>`;}
   const line=points.map((p,idx)=>`${x(idx)},${y(p.value)}`).join(' ');
   const dots=points.map((p,idx)=>`<circle class="dot" cx="${x(idx)}" cy="${y(p.value)}" r="3"/>`).join('');
   const n=points.length;
-  const xlabels=points.map((p,idx)=>{if(n>6&&idx%Math.ceil(n/6)!==0&&idx!==n-1)return '';return `<text class="xl" x="${x(idx)}" y="${H-10}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');
+  const step=Math.ceil(n/6);
+  const xlabels=points.map((p,idx)=>{if(n>6&&idx!==n-1&&(idx%step!==0||n-1-idx<step))return '';return `<text class="xl" x="${x(idx)}" y="${H-10}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${grid}<polyline class="ln" points="${line}"/>${dots}${xlabels}</svg>`;
 }
 function starsSeries(period){
@@ -1735,6 +1748,220 @@ function renderGraphs(el){
   </div>`;
   }
   el.innerHTML=h;
+}
+
+// ── HEALTH (Fitbit data via the Google Health API, read-only) ──
+// Same Google client as Drive sync, with its own token and redirect state. Day values are
+// cached on this device only (not synced to Drive) — they can always be fetched again.
+const HEALTH_API='https://health.googleapis.com/v4/users/me/dataTypes/';
+const HEALTH_SCOPES=['activity_and_fitness','sleep','health_metrics_and_measurements'].map(s=>`https://www.googleapis.com/auth/googlehealth.${s}.readonly`).join(' ');
+const HEALTH_DAYS=84; // first fetch; later refreshes re-fetch the last 14 days
+let healthDay=null,healthRange=14,healthBusy=false,healthErr=null,healthReturn=false,healthAttempt=0;
+function getHealthToken(){try{const t=JSON.parse(localStorage.getItem('journal_health_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
+function healthTokenInvalid(){localStorage.removeItem('journal_health_tok');}
+function healthOn(){return !!localStorage.getItem(`journal_health_on_${currentUser}`);}
+function healthAuthRedirect(interactive){
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:HEALTH_SCOPES,state:'daybook_health',include_granted_scopes:'true'});
+  if(currentUserEmail)p.set('login_hint',currentUserEmail);
+  p.set('prompt',interactive?'consent':'none');
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
+}
+function checkHealthRedirect(){
+  if(!location.hash)return;
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('state')!=='daybook_health')return;
+  healthReturn=true;
+  const err=h.get('error');
+  if(err){sessionStorage.setItem('journal_health_err',err);}
+  else if(h.get('access_token')){
+    const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
+    localStorage.setItem('journal_health_tok',JSON.stringify({tok:h.get('access_token'),exp}));
+    sessionStorage.removeItem('journal_health_err');sessionStorage.removeItem('journal_health_tried');
+  }
+  history.replaceState(null,'',location.pathname+location.search);
+}
+function connectHealth(){sessionStorage.removeItem('journal_health_err');healthAuthRedirect(true);}
+function disconnectHealth(){
+  if(!confirm('Disconnect Fitbit? The numbers already fetched are removed from this device.'))return;
+  healthTokenInvalid();localStorage.removeItem(`journal_health_on_${currentUser}`);setStore(userKey('health'),{});
+  showView('health');
+}
+function healthData(){return Object.assign({days:{},fetched:0},userData('health',{}));}
+function hDate(d){return {year:d.getFullYear(),month:d.getMonth()+1,day:d.getDate()};}
+function hKey(o){return o&&o.year?`${o.year}-${String(o.month).padStart(2,'0')}-${String(o.day).padStart(2,'0')}`:null;}
+function addDays(d,n){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()+n);return x;}
+async function healthFetch(url,opts){
+  const tok=getHealthToken();if(!tok)throw new Error('Fitbit sign-in expired — tap Connect Fitbit again.');
+  opts=Object.assign({},opts);opts.headers=Object.assign({Authorization:'Bearer '+tok},opts.headers||{});
+  const res=await fetch(url,opts);
+  if(res.status===401){healthTokenInvalid();throw new Error('Fitbit sign-in expired — tap Connect Fitbit again.');}
+  if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&j.error.message)||'';}catch(e){}throw new Error(msg||'Google Health error '+res.status);}
+  return res.json();
+}
+// Daily totals for [start,end) — some types only allow 14 days per request, so it chunks.
+async function healthRollup(type,start,end,maxDays){
+  const out=[];
+  for(let s=start;s<end;s=addDays(s,maxDays)){
+    const e=addDays(s,maxDays)<end?addDays(s,maxDays):end;let pageToken='';
+    do{
+      const body={range:{start:{date:hDate(s)},end:{date:hDate(e)}},windowSizeDays:1,pageSize:100};
+      if(pageToken)body.pageToken=pageToken;
+      const j=await healthFetch(HEALTH_API+type+'/dataPoints:dailyRollUp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      out.push(...(j.rollupDataPoints||[]));pageToken=j.nextPageToken||'';
+    }while(pageToken);
+  }
+  return out;
+}
+async function healthList(type,filter,pageSize){
+  const out=[];let pageToken='';
+  do{
+    const q=new URLSearchParams({filter,pageSize:String(pageSize)});if(pageToken)q.set('pageToken',pageToken);
+    const j=await healthFetch(HEALTH_API+type+'/dataPoints?'+q.toString());
+    out.push(...(j.dataPoints||[]));pageToken=j.nextPageToken||'';
+  }while(pageToken&&out.length<1000);
+  return out;
+}
+async function healthSync(){
+  if(healthBusy||!getHealthToken())return;
+  healthBusy=true;healthErr=null;healthAttempt=Date.now();if(currentView==='health')refreshView();
+  const hd=healthData(),days=hd.days,today=new Date();
+  const start=addDays(today,1-(hd.fetched?14:HEALTH_DAYS)),end=addDays(today,1),from=dkey(start);
+  const put=(k,f,v)=>{if(!k||v==null||isNaN(v))return;(days[k]=days[k]||{})[f]=v;};
+  const rk=p=>hKey(p.civilStartTime&&p.civilStartTime.date);
+  const jobs=[
+    healthRollup('steps',start,end,90).then(r=>r.forEach(p=>p.steps&&put(rk(p),'steps',+p.steps.countSum))),
+    healthRollup('distance',start,end,90).then(r=>r.forEach(p=>p.distance&&put(rk(p),'km',Math.round(p.distance.millimetersSum/1e4)/100))),
+    healthRollup('active-minutes',start,end,14).then(r=>r.forEach(p=>{
+      if(!p.activeMinutes)return;let mv=0,lt=0,any=false;
+      [].concat(p.activeMinutes.activeMinutesRollupByActivityLevel||[]).forEach(x=>{any=true;const m=+x.activeMinutesSum||0;if(x.activityLevel==='LIGHT')lt+=m;else mv+=m;});
+      if(any){put(rk(p),'activeMin',mv);put(rk(p),'lightMin',lt);}
+    })),
+    healthRollup('total-calories',start,end,14).then(r=>r.forEach(p=>p.totalCalories&&put(rk(p),'kcal',Math.round(p.totalCalories.kcalSum)))),
+    healthRollup('weight',start,end,90).then(r=>r.forEach(p=>p.weight&&p.weight.weightGramsAvg&&put(rk(p),'kg',Math.round(p.weight.weightGramsAvg/100)/10))),
+    healthList('daily-resting-heart-rate',`daily_resting_heart_rate.date >= "${from}"`,100).then(r=>r.forEach(p=>{const x=p.dailyRestingHeartRate;if(x)put(hKey(x.date),'rhr',+x.beatsPerMinute);})),
+    healthList('sleep',`sleep.interval.civil_end_time >= "${from}"`,25).then(r=>{
+      // a night counts on the day you woke up; naps add to the total
+      const nights={};
+      r.forEach(p=>{
+        const s=p.sleep;if(!s||!s.summary||!s.interval)return;
+        const k=hKey(s.interval.civilEndTime&&s.interval.civilEndTime.date);if(!k)return;
+        const n=nights[k]=nights[k]||{min:0,stages:null};n.min+=+s.summary.minutesAsleep||0;
+        if(s.metadata&&s.metadata.mainSleep){n.stages={};[].concat(s.summary.stagesSummary||[]).forEach(st=>{n.stages[st.type]=+st.minutes||0;});}
+      });
+      Object.keys(nights).forEach(k=>{put(k,'sleepMin',nights[k].min);if(nights[k].stages)days[k].stages=nights[k].stages;});
+    })
+  ];
+  const res=await Promise.allSettled(jobs);
+  const fails=res.filter(x=>x.status==='rejected');
+  if(fails.length)healthErr=fails[0].reason&&fails[0].reason.message||'Could not reach Google Health.';
+  if(fails.length<jobs.length){hd.fetched=Date.now();setStore(userKey('health'),hd);}
+  healthBusy=false;
+  if(currentView==='health')refreshView();
+}
+// Opening the tab: reconnect silently once per session if the hour-long token ran out, and refresh if stale.
+function healthOnOpen(){
+  if(!healthOn())return;
+  if(!getHealthToken()){
+    if(!sessionStorage.getItem('journal_health_tried')&&!sessionStorage.getItem('journal_health_err')){sessionStorage.setItem('journal_health_tried','1');healthAuthRedirect(false);}
+    return;
+  }
+  if(Date.now()-Math.max(healthData().fetched,healthAttempt)>15*60*1000)healthSync();
+}
+function fmtHM(m){m=Math.round(m||0);return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;}
+const HEALTH_FIELDS=[
+  {k:'steps',l:'Steps',f:v=>Math.round(v).toLocaleString('en-GB'),min:0},
+  {k:'activeMin',l:'Active minutes',f:v=>v+' min',min:0,sub:d=>d.lightMin!=null?`+ ${d.lightMin} min light`:''},
+  {k:'sleepMin',l:'Sleep',f:fmtHM,min:0,chart:v=>Math.round(v/6)/10,suffix:'h',sub:d=>d.stages&&(d.stages.DEEP!=null||d.stages.REM!=null)?`Deep ${fmtHM(d.stages.DEEP)} · REM ${fmtHM(d.stages.REM)}`:''},
+  {k:'rhr',l:'Resting heart rate',f:v=>v+' bpm'},
+  {k:'km',l:'Distance',f:v=>v.toFixed(1)+' km',min:0},
+  {k:'kcal',l:'Calories',f:v=>v.toLocaleString('en-GB')+' kcal',min:0},
+  {k:'kg',l:'Weight',f:v=>v.toFixed(1)+' kg',carry:true}
+];
+// Latest value on or before a day (weight isn't logged every day).
+function healthLatest(days,k,dk){const keys=Object.keys(days).filter(x=>x<=dk&&days[x][k]!=null).sort();const last=keys[keys.length-1];return last?{date:last,v:days[last][k]}:null;}
+function healthSeries(days,f){
+  const out=[],today=new Date();
+  if(healthRange===90){
+    const b={};
+    for(let i=89;i>=0;i--){const k=dkey(addDays(today,-i));const d=days[k];if(!d||d[f.k]==null)continue;const w=weekMonday(parseKey(k));(b[w]=b[w]||[]).push(d[f.k]);}
+    Object.keys(b).sort().forEach(w=>{const avg=b[w].reduce((a,c)=>a+c,0)/b[w].length;out.push({label:bucketLabel(w,'weekly'),value:f.chart?f.chart(avg):Math.round(avg*10)/10});});
+  }else{
+    for(let i=healthRange-1;i>=0;i--){const k=dkey(addDays(today,-i));const d=days[k];if(!d||d[f.k]==null)continue;out.push({label:bucketLabel(k,'daily'),value:f.chart?f.chart(d[f.k]):d[f.k]});}
+  }
+  return out;
+}
+function setHealthRange(n){healthRange=n;showView('health');}
+function healthShiftDay(n){const t=dkey(new Date());const d=dkey(addDays(parseKey(healthDay||t),n));healthDay=d>t?t:d;showView('health');}
+function healthAgo(t){if(!t)return 'never';const m=Math.round((Date.now()-t)/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':Math.round(h/24)+' d ago';}
+function renderHealth(el){
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Health</div><div class="section-sub">Your Fitbit numbers, and a coach to talk them through.</div></div></div>`;
+  if(getHealthToken())localStorage.setItem(`journal_health_on_${currentUser}`,'1');
+  const err=sessionStorage.getItem('journal_health_err');
+  if(!healthOn()||(!getHealthToken()&&err)){
+    h+=`<div class="graph-card" style="padding-bottom:16px"><div class="graph-title">Connect your Fitbit</div>
+      <div class="graph-sub">Daybook reads your steps, activity, sleep, resting heart rate and weight from Google Health (where Fitbit data now lives). It only reads — it never changes anything in Fitbit.${err?`<br><br><b>Last attempt didn't finish</b> (${esc(err)}). If Google says the app isn't verified, tap <b>Advanced → Go to Daybook</b>.`:''}</div>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="connectHealth()">Connect Fitbit</button></div>`;
+    el.innerHTML=h;return;
+  }
+  const hd=healthData(),days=hd.days,today=dkey(new Date());
+  const dk=healthDay||today,d=days[dk]||{};
+  h+=`<div class="hl-status">${healthBusy?'Fetching from Fitbit…':`Updated ${healthAgo(hd.fetched)}`}${healthBusy?'':` · <a onclick="healthSync()">Refresh</a>`}</div>`;
+  if(healthErr)h+=`<div class="hl-err">${esc(healthErr)}</div>`;
+  h+=`<div class="hl-day"><button class="icon-btn" onclick="healthShiftDay(-1)">‹</button><span>${dk===today?'Today':parseKey(dk).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</span><button class="icon-btn" onclick="healthShiftDay(1)" ${dk===today?'disabled style="opacity:.3"':''}>›</button></div>
+  <div class="hl-tiles">${HEALTH_FIELDS.map(f=>{
+    let v=d[f.k],sub=f.sub?f.sub(d):'';
+    if(v==null&&f.carry){const l=healthLatest(days,f.k,dk);if(l){v=l.v;sub='Logged '+parseKey(l.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}}
+    return `<div class="hl-tile"><div class="l">${f.l}</div><div class="v">${v==null?'—':f.f(v)}</div>${sub?`<div class="s">${sub}</div>`:''}</div>`;
+  }).join('')}</div>
+  <div class="graph-card" style="padding-bottom:16px"><div class="graph-title">Your coach</div>
+    <div class="graph-sub">Opens a new Claude chat with your last 2 weeks of numbers, habits and workouts already written in — just press send. It's also copied, in case you need to paste it.</div>
+    <div class="vfield tall"><textarea id="hl-q" oninput="autogrow(this)" placeholder="Anything you want to ask? (optional)"></textarea></div>
+    <button class="btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="healthAskCoach()">Ask my coach</button></div>
+  <div class="sc-cadence"><span class="lbl">Show</span><span class="sc-seg">
+    <button class="${healthRange===14?'on':''}" onclick="setHealthRange(14)">2 weeks</button>
+    <button class="${healthRange===30?'on':''}" onclick="setHealthRange(30)">Month</button>
+    <button class="${healthRange===90?'on':''}" onclick="setHealthRange(90)">3 months</button>
+  </span></div>`;
+  HEALTH_FIELDS.forEach(f=>{
+    const s=healthSeries(days,f);
+    h+=`<div class="graph-card"><div class="graph-title">${f.l}</div><div class="graph-sub">${healthRange===90?'Weekly average':'Per day'}</div>${lineChartSVG(s,{min:f.min,suffix:f.suffix})}</div>`;
+  });
+  h+=`<div style="text-align:center;margin:6px 0 10px"><button class="btn" onclick="disconnectHealth()">Disconnect Fitbit</button></div>`;
+  el.innerHTML=h;
+}
+function healthCoachText(question){
+  const days=healthData().days,today=new Date(),rows=[];
+  for(let i=13;i>=0;i--){
+    const k=dkey(addDays(today,-i)),d=days[k]||{};
+    rows.push(`${parseKey(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}: `+([
+      d.steps!=null?Math.round(d.steps)+' steps':null,d.activeMin!=null?d.activeMin+' active min':null,d.km!=null?d.km+' km':null,d.kcal!=null?d.kcal+' kcal':null,
+      d.sleepMin!=null?'slept '+fmtHM(d.sleepMin)+(d.stages&&d.stages.DEEP!=null?` (deep ${fmtHM(d.stages.DEEP)}, REM ${fmtHM(d.stages.REM)})`:''):null,
+      d.rhr!=null?'resting HR '+d.rhr:null,d.kg!=null?d.kg+' kg':null
+    ].filter(Boolean).join(', ')||'no data'));
+  }
+  const avg=(k,from,to)=>{const v=[];for(let i=from;i<to;i++){const x=(days[dkey(addDays(today,-i))]||{})[k];if(x!=null)v.push(x);}return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
+  const cmp=[['steps','steps/day'],['activeMin','active min/day'],['sleepMin','min sleep/night'],['rhr','resting HR']].map(([k,l])=>{const a=avg(k,0,28),b=avg(k,28,56);return a==null?null:`${l}: ${a}${b!=null?` (previous 4 weeks: ${b})`:''}`;}).filter(Boolean);
+  const habits=habitTotals().map(r=>`${r.label}: ${r.pos} positive, ${r.neg} negative`);
+  const wks=(workoutsData().list||[]).map(w=>w.name);
+  let t=`You're my personal health and fitness coach — like Fitbit's premium coach. Below is my data from my Daybook app (from my Fitbit). Please:
+1. Sum up how my last week went compared with the week before.
+2. Point out any patterns (e.g. sleep vs. activity, weekdays vs. weekends).
+3. Give me 2–3 specific, realistic things to focus on this coming week.
+Keep it warm, encouraging and short.
+
+LAST 14 DAYS
+${rows.join('\n')}`;
+  if(cmp.length)t+=`\n\n4-WEEK AVERAGES\n${cmp.join('\n')}`;
+  if(habits.length)t+=`\n\nHABIT SCORECARD TOTALS\n${habits.join('\n')}`;
+  if(wks.length)t+=`\n\nMY SAVED WORKOUTS\n${wks.join(', ')}`;
+  if(question)t+=`\n\nMY QUESTION\n${question}`;
+  return t;
+}
+function healthAskCoach(){
+  const q=((document.getElementById('hl-q')||{}).value||'').trim();
+  const text=healthCoachText(q);
+  try{navigator.clipboard.writeText(text).catch(()=>{});}catch(e){}
+  window.open('https://claude.ai/new?q='+encodeURIComponent(text),'_blank');
 }
 
 // ── WORKOUTS ──
