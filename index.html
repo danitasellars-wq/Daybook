@@ -1914,7 +1914,7 @@ function renderHealth(el){
     return `<div class="hl-tile"><div class="l">${f.l}</div><div class="v">${v==null?'—':f.f(v)}</div>${sub?`<div class="s">${sub}</div>`:''}</div>`;
   }).join('')}</div>
   <div class="graph-card" style="padding-bottom:16px"><div class="graph-title">Your coach</div>
-    <div class="graph-sub">Opens a new Claude chat with your last 2 weeks of numbers, habits and workouts already written in — just press send. It's also copied, in case you need to paste it.</div>
+    <div class="graph-sub">Copies your last 2 weeks of numbers, habits and workouts, then opens your coach project in Claude. Start a new chat there, paste and send.</div>
     <div class="vfield tall"><textarea id="hl-q" oninput="autogrow(this)" placeholder="Anything you want to ask? (optional)"></textarea></div>
     <button class="btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="healthAskCoach()">Ask my coach</button></div>
   <div class="sc-cadence"><span class="lbl">Show</span><span class="sc-seg">
@@ -1957,11 +1957,20 @@ ${rows.join('\n')}`;
   if(question)t+=`\n\nMY QUESTION\n${question}`;
   return t;
 }
+// The coach lives in a Claude Project (its instructions hold the standing brief). There's no
+// documented link that starts a project chat with text filled in, so the message is copied and
+// the project opens; ?q= is added in case Claude ever fills it in from there.
+const COACH_PROJECT_URL='https://claude.ai/project/01a0f96e-9c6a-70d2-b25e-9b69a191bbc0';
 function healthAskCoach(){
   const q=((document.getElementById('hl-q')||{}).value||'').trim();
   const text=healthCoachText(q);
-  try{navigator.clipboard.writeText(text).catch(()=>{});}catch(e){}
-  window.open('https://claude.ai/new?q='+encodeURIComponent(text),'_blank');
+  const showText=()=>openModal(`<div class="graph-sub">Copying didn't work — press and hold in the box, Select all, Copy, then paste it into a new chat in your coach project.</div><div class="vfield tall"><textarea readonly style="min-height:40vh">${esc(text)}</textarea></div><div class="tb-actions"><button class="btn primary" onclick="window.open(COACH_PROJECT_URL,'_blank')">Open coach</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Your coach message');
+  let copied;
+  try{copied=navigator.clipboard.writeText(text);}catch(e){copied=Promise.reject(e);}
+  copied.then(()=>{
+    showToast('Copied — start a new chat in your coach project and paste',true);
+    window.open(COACH_PROJECT_URL+'?q='+encodeURIComponent(text),'_blank');
+  },showText);
 }
 
 // ── WORKOUTS ──
