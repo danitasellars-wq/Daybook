@@ -1757,11 +1757,11 @@ const HEALTH_API='https://health.googleapis.com/v4/users/me/dataTypes/';
 const HEALTH_SCOPES=['activity_and_fitness','sleep','health_metrics_and_measurements'].map(s=>`https://www.googleapis.com/auth/googlehealth.${s}.readonly`).join(' ');
 const HEALTH_DAYS=84; // first fetch; later refreshes re-fetch the last 14 days
 let healthDay=null,healthRange=14,healthBusy=false,healthErr=null,healthReturn=false,healthAttempt=0;
-function getHealthToken(){try{const t=JSON.parse(localStorage.getItem('journal_health_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
-function healthTokenInvalid(){localStorage.removeItem('journal_health_tok');}
+function getHealthToken(){try{const t=JSON.parse(localStorage.getItem('journal_health_tok2')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
+function healthTokenInvalid(){localStorage.removeItem('journal_health_tok2');}
 function healthOn(){return !!localStorage.getItem(`journal_health_on_${currentUser}`);}
 function healthAuthRedirect(interactive){
-  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:HEALTH_SCOPES,state:'daybook_health',include_granted_scopes:'true'});
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:HEALTH_SCOPES,state:'daybook_health'});
   if(currentUserEmail)p.set('login_hint',currentUserEmail);
   p.set('prompt',interactive?'consent':'none');
   location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
@@ -1775,7 +1775,7 @@ function checkHealthRedirect(){
   if(err){sessionStorage.setItem('journal_health_err',err);}
   else if(h.get('access_token')){
     const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
-    localStorage.setItem('journal_health_tok',JSON.stringify({tok:h.get('access_token'),exp}));
+    localStorage.setItem('journal_health_tok2',JSON.stringify({tok:h.get('access_token'),exp}));
     sessionStorage.removeItem('journal_health_err');sessionStorage.removeItem('journal_health_tried');
   }
   history.replaceState(null,'',location.pathname+location.search);
