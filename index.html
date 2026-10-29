@@ -330,6 +330,8 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .hl-status a{color:var(--accent);cursor:pointer;text-decoration:underline}
 .hl-err{font-size:.8rem;color:var(--danger,#b4462f);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.4}
 .hl-day{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-family:var(--serif);font-size:1.15rem;font-weight:700}
+.hl-how summary{font-size:.82rem;color:var(--accent);cursor:pointer;margin-top:8px}
+.hl-instr{font-size:.8rem;line-height:1.45;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px;user-select:all;-webkit-user-select:all}
 .hl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .hl-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;min-width:0}
 .hl-tile .l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
@@ -554,7 +556,7 @@ function handleGoogleLogin(response){
   const p=parseJwt(response.credential);if(!p)return;
   localStorage.setItem('journal_sess',JSON.stringify({sub:p.sub,email:p.email||null,name:p.name||p.email||'You',exp:Date.now()+30*24*60*60*1000}));
   enterApp(p.sub,p.email||null,p.name||p.email||'You');
-  if(!driveBoot())bkDriveBoot();
+  if(!driveBoot()&&!bkDriveBoot())healthBoot(true);
 }
 function localSignIn(){
   localStorage.setItem('journal_sess',JSON.stringify({sub:'local',email:null,name:'You',exp:Date.now()+3650*24*60*60*1000}));
@@ -574,6 +576,7 @@ function enterApp(sub,email,name){
   setupReminderSW();
   mirrorReminders(settingsData());
   setInterval(checkDueRemindersForeground,60000);
+  setInterval(healthTick,5*60*1000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDueRemindersForeground();});
 }
 function signOut(){
@@ -585,11 +588,12 @@ window.addEventListener('load',()=>{
   checkDriveRedirect();
   checkBkDriveRedirect();
   checkHealthRedirect();
+  checkCoachDocRedirect();
   try{
     const sess=JSON.parse(localStorage.getItem('journal_sess')||'null');
     if(sess&&sess.exp>Date.now()&&sess.sub){
       enterApp(sess.sub,sess.email||null,sess.name||'You');
-      if(sess.sub!=='local'){if(!driveBoot())bkDriveBoot();}
+      if(sess.sub!=='local'){if(!driveBoot()&&!bkDriveBoot())healthBoot(true);}
       return;
     }
   }catch(e){}
@@ -820,12 +824,14 @@ function checkBkDriveRedirect(){
 function bkDriveBoot(){
   if(getBkToken()){
     localStorage.setItem(`journal_bkdrive_on_${currentUser}`,'1');
-    return;
+    return false;
   }
   if(localStorage.getItem(`journal_bkdrive_on_${currentUser}`)&&!sessionStorage.getItem('journal_bkdrive_tried')){
     sessionStorage.setItem('journal_bkdrive_tried','1');
     bkDriveAuthRedirect(false);
+    return true;
   }
+  return false;
 }
 function bkDisconnect(){
   if(!confirm('Disconnect Google Drive backup? The folder you already backed up to keeps its file, but it will stop updating.'))return;
@@ -1770,7 +1776,7 @@ function checkHealthRedirect(){
   if(!location.hash)return;
   const h=new URLSearchParams(location.hash.slice(1));
   if(h.get('state')!=='daybook_health')return;
-  healthReturn=true;
+  healthReturn=!sessionStorage.getItem('journal_auth_bg');sessionStorage.removeItem('journal_auth_bg');
   const err=h.get('error');
   if(err){sessionStorage.setItem('journal_health_err',err);}
   else if(h.get('access_token')){
@@ -1856,17 +1862,26 @@ async function healthSync(){
   if(fails.length)healthErr=fails[0].reason&&fails[0].reason.message||'Could not reach Google Health.';
   if(fails.length<jobs.length){hd.fetched=Date.now();setStore(userKey('health'),hd);}
   healthBusy=false;
+  if(fails.length<jobs.length)coachDocWrite();
   if(currentView==='health')refreshView();
 }
-// Opening the tab: reconnect silently once per session if the hour-long token ran out, and refresh if stale.
-function healthOnOpen(){
-  if(!healthOn())return;
-  if(!getHealthToken()){
-    if(!sessionStorage.getItem('journal_health_tried')&&!sessionStorage.getItem('journal_health_err')){sessionStorage.setItem('journal_health_tried','1');healthAuthRedirect(false);}
-    return;
-  }
+// On app start (bg) and on opening the tab: reconnect silently once per session if an hour-long
+// token ran out, then refresh if stale. Returns true if it navigated away to sign in.
+function healthBoot(bg){
+  if(!healthOn())return false;
+  const silent=(key,go)=>{
+    if(sessionStorage.getItem(key+'_tried')||sessionStorage.getItem(key+'_err'))return false;
+    sessionStorage.setItem(key+'_tried','1');if(bg)sessionStorage.setItem('journal_auth_bg','1');go(false);return true;
+  };
+  if(!getHealthToken())return silent('journal_health',healthAuthRedirect);
+  if(coachDocOn()&&!getCoachDocToken()&&silent('journal_coachdoc',coachDocAuthRedirect))return true;
   if(Date.now()-Math.max(healthData().fetched,healthAttempt)>15*60*1000)healthSync();
+  else if(getCoachDocToken()&&(userData('coachdoc',{}).written||0)<healthData().fetched)coachDocWrite();
+  return false;
 }
+function healthOnOpen(){healthBoot(false);}
+// While the app stays open: refresh quietly every half hour (never redirects — you might be typing).
+function healthTick(){if(healthOn()&&getHealthToken()&&Date.now()-Math.max(healthData().fetched,healthAttempt)>30*60*1000)healthSync();}
 function fmtHM(m){m=Math.round(m||0);return `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m`;}
 const HEALTH_FIELDS=[
   {k:'steps',l:'Steps',f:v=>Math.round(v).toLocaleString('en-GB'),min:0},
@@ -1894,7 +1909,7 @@ function setHealthRange(n){healthRange=n;showView('health');}
 function healthShiftDay(n){const t=dkey(new Date());const d=dkey(addDays(parseKey(healthDay||t),n));healthDay=d>t?t:d;showView('health');}
 function healthAgo(t){if(!t)return 'never';const m=Math.round((Date.now()-t)/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':Math.round(h/24)+' d ago';}
 function renderHealth(el){
-  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Health</div><div class="section-sub">Your Fitbit numbers, and a coach to talk them through.</div></div></div>`;
+  let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Health</div><div class="section-sub">Your Fitbit numbers, kept ready for your coach.</div></div></div>`;
   if(getHealthToken())localStorage.setItem(`journal_health_on_${currentUser}`,'1');
   const err=sessionStorage.getItem('journal_health_err');
   if(!healthOn()||(!getHealthToken()&&err)){
@@ -1913,10 +1928,7 @@ function renderHealth(el){
     if(v==null&&f.carry){const l=healthLatest(days,f.k,dk);if(l){v=l.v;sub='Logged '+parseKey(l.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}}
     return `<div class="hl-tile"><div class="l">${f.l}</div><div class="v">${v==null?'—':f.f(v)}</div>${sub?`<div class="s">${sub}</div>`:''}</div>`;
   }).join('')}</div>
-  <div class="graph-card" style="padding-bottom:16px"><div class="graph-title">Your coach</div>
-    <div class="graph-sub">Copies your last 2 weeks of numbers, habits and workouts, then opens your coach project in Claude. Start a new chat there, paste and send.</div>
-    <div class="vfield tall"><textarea id="hl-q" oninput="autogrow(this)" placeholder="Anything you want to ask? (optional)"></textarea></div>
-    <button class="btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="healthAskCoach()">Ask my coach</button></div>
+  ${coachDocCardHTML()}
   <div class="sc-cadence"><span class="lbl">Show</span><span class="sc-seg">
     <button class="${healthRange===14?'on':''}" onclick="setHealthRange(14)">2 weeks</button>
     <button class="${healthRange===30?'on':''}" onclick="setHealthRange(30)">Month</button>
@@ -1929,48 +1941,121 @@ function renderHealth(el){
   h+=`<div style="text-align:center;margin:6px 0 10px"><button class="btn" onclick="disconnectHealth()">Disconnect Fitbit</button></div>`;
   el.innerHTML=h;
 }
-function healthCoachText(question){
-  const days=healthData().days,today=new Date(),rows=[];
-  for(let i=13;i>=0;i--){
-    const k=dkey(addDays(today,-i)),d=days[k]||{};
-    rows.push(`${parseKey(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}: `+([
-      d.steps!=null?Math.round(d.steps)+' steps':null,d.activeMin!=null?d.activeMin+' active min':null,d.km!=null?d.km+' km':null,d.kcal!=null?d.kcal+' kcal':null,
-      d.sleepMin!=null?'slept '+fmtHM(d.sleepMin)+(d.stages&&d.stages.DEEP!=null?` (deep ${fmtHM(d.stages.DEEP)}, REM ${fmtHM(d.stages.REM)})`:''):null,
-      d.rhr!=null?'resting HR '+d.rhr:null,d.kg!=null?d.kg+' kg':null
-    ].filter(Boolean).join(', ')||'no data'));
-  }
-  const avg=(k,from,to)=>{const v=[];for(let i=from;i<to;i++){const x=(days[dkey(addDays(today,-i))]||{})[k];if(x!=null)v.push(x);}return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
-  const cmp=[['steps','steps/day'],['activeMin','active min/day'],['sleepMin','min sleep/night'],['rhr','resting HR']].map(([k,l])=>{const a=avg(k,0,28),b=avg(k,28,56);return a==null?null:`${l}: ${a}${b!=null?` (previous 4 weeks: ${b})`:''}`;}).filter(Boolean);
-  const habits=habitTotals().map(r=>`${r.label}: ${r.pos} positive, ${r.neg} negative`);
-  const wks=(workoutsData().list||[]).map(w=>w.name);
-  let t=`You're my personal health and fitness coach — like Fitbit's premium coach. Below is my data from my Daybook app (from my Fitbit). Please:
-1. Sum up how my last week went compared with the week before.
-2. Point out any patterns (e.g. sleep vs. activity, weekdays vs. weekends).
-3. Give me 2–3 specific, realistic things to focus on this coming week.
-Keep it warm, encouraging and short.
-
-LAST 14 DAYS
-${rows.join('\n')}`;
-  if(cmp.length)t+=`\n\n4-WEEK AVERAGES\n${cmp.join('\n')}`;
-  if(habits.length)t+=`\n\nHABIT SCORECARD TOTALS\n${habits.join('\n')}`;
-  if(wks.length)t+=`\n\nMY SAVED WORKOUTS\n${wks.join(', ')}`;
-  if(question)t+=`\n\nMY QUESTION\n${question}`;
-  return t;
+// ── COACH DOC ──
+// This week's numbers (Mon → today) in a Google Doc that the Claude coach project reads with
+// its Google Drive connector; history lives in the project itself. drive.file only lets Daybook
+// see files it made. Its own token, because Google Health refuses tokens carrying other scopes.
+const COACH_DOC_NAME='Daybook – this week (for my coach)';
+const COACH_DOC_SCOPE='https://www.googleapis.com/auth/drive.file';
+const COACH_INSTRUCTION=`At the start of every chat, use the Google Drive connector to find and read the Google Doc "${COACH_DOC_NAME}". It has my Fitbit numbers for the current week so far, updated automatically by my Daybook app. Use it together with the history in this project.`;
+let coachDocBusy=false;
+function getCoachDocToken(){try{const t=JSON.parse(localStorage.getItem('journal_coachdoc_tok')||'null');if(t&&t.exp>Date.now())return t.tok;}catch(e){}return null;}
+function coachDocOn(){return !!localStorage.getItem(`journal_coachdoc_on_${currentUser}`);}
+function coachDocAuthRedirect(interactive){
+  const p=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:COACH_DOC_SCOPE,state:'daybook_coachdoc'});
+  if(currentUserEmail)p.set('login_hint',currentUserEmail);
+  p.set('prompt',interactive?'consent':'none');
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
 }
-// The coach lives in a Claude Project (its instructions hold the standing brief). There's no
-// documented link that starts a project chat with text filled in, so the message is copied and
-// the project opens; ?q= is added in case Claude ever fills it in from there.
-const COACH_PROJECT_URL='https://claude.ai/project/01a0f96e-9c6a-70d2-b25e-9b69a191bbc0';
-function healthAskCoach(){
-  const q=((document.getElementById('hl-q')||{}).value||'').trim();
-  const text=healthCoachText(q);
-  const showText=()=>openModal(`<div class="graph-sub">Copying didn't work — press and hold in the box, Select all, Copy, then paste it into a new chat in your coach project.</div><div class="vfield tall"><textarea readonly style="min-height:40vh">${esc(text)}</textarea></div><div class="tb-actions"><button class="btn primary" onclick="window.open(COACH_PROJECT_URL,'_blank')">Open coach</button><button class="btn" onclick="closeModal()">Close</button></div>`,'Your coach message');
-  let copied;
-  try{copied=navigator.clipboard.writeText(text);}catch(e){copied=Promise.reject(e);}
-  copied.then(()=>{
-    showToast('Copied — start a new chat in your coach project and paste',true);
-    window.open(COACH_PROJECT_URL+'?q='+encodeURIComponent(text),'_blank');
-  },showText);
+function checkCoachDocRedirect(){
+  if(!location.hash)return;
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('state')!=='daybook_coachdoc')return;
+  healthReturn=!sessionStorage.getItem('journal_auth_bg');sessionStorage.removeItem('journal_auth_bg');
+  const err=h.get('error');
+  if(err){sessionStorage.setItem('journal_coachdoc_err',err);}
+  else if(h.get('access_token')){
+    const exp=Date.now()+(parseInt(h.get('expires_in')||'3600',10)-60)*1000;
+    localStorage.setItem('journal_coachdoc_tok',JSON.stringify({tok:h.get('access_token'),exp}));
+    sessionStorage.removeItem('journal_coachdoc_err');sessionStorage.removeItem('journal_coachdoc_tried');
+  }
+  history.replaceState(null,'',location.pathname+location.search);
+}
+function coachDocConnect(){localStorage.setItem(`journal_coachdoc_on_${currentUser}`,'1');sessionStorage.removeItem('journal_coachdoc_err');coachDocAuthRedirect(true);}
+function coachDocStop(){
+  if(!confirm('Stop updating the coach doc? The doc stays in your Drive with its last numbers.'))return;
+  localStorage.removeItem('journal_coachdoc_tok');localStorage.removeItem(`journal_coachdoc_on_${currentUser}`);showView('health');
+}
+async function coachDocFetch(url,opts){
+  const res=await fetch(url,opts);
+  if(res.status===401){localStorage.removeItem('journal_coachdoc_tok');throw new Error('Google Drive sign-in expired — it reconnects next time you open Daybook.');}
+  if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&j.error.message)||'';}catch(e){}throw new Error(msg||'Google Drive error '+res.status);}
+  return res;
+}
+function healthDayLine(d){
+  return [
+    d.steps!=null?Math.round(d.steps).toLocaleString('en-GB')+' steps':null,
+    d.activeMin!=null?d.activeMin+' active min'+(d.lightMin!=null?` (+${d.lightMin} light)`:''):null,
+    d.km!=null?d.km+' km':null,d.kcal!=null?d.kcal.toLocaleString('en-GB')+' kcal':null,
+    d.sleepMin!=null?'slept '+fmtHM(d.sleepMin)+(d.stages&&d.stages.DEEP!=null?` (deep ${fmtHM(d.stages.DEEP)}, REM ${fmtHM(d.stages.REM)})`:''):null,
+    d.rhr!=null?'resting HR '+d.rhr+' bpm':null,d.kg!=null?'weight '+d.kg+' kg':null
+  ].filter(Boolean).join(' · ');
+}
+function coachWeekText(){
+  const days=healthData().days,now=new Date(),today=dkey(now),mon=parseKey(weekMonday(now));
+  const fd=k=>parseKey(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  const keys=[];for(let d=mon;dkey(d)<=today;d=addDays(d,1))keys.push(dkey(d));
+  const out=[
+    'DAYBOOK – THIS WEEK SO FAR',
+    `Week of ${fd(keys[0])} – ${fd(dkey(addDays(mon,6)))} ${mon.getFullYear()}. Last updated ${now.toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}.`,
+    "From my Fitbit via Google Health, written automatically by my Daybook app. Today isn't over, so today's activity numbers are partial (sleep is last night's).",
+    '',
+    'DAY BY DAY'
+  ];
+  keys.forEach(k=>out.push(`${fd(k)}${k===today?' (today, so far)':''}: ${healthDayLine(days[k]||{})||'no data'}`));
+  const vals=(ks,f)=>ks.map(k=>(days[k]||{})[f]).filter(v=>v!=null);
+  const sum=a=>a.reduce((x,y)=>x+y,0),avg=a=>Math.round(sum(a)/a.length);
+  const full=keys.filter(k=>k!==today),st=vals(full,'steps'),am=vals(full,'activeMin'),sl=vals(keys,'sleepMin'),hr=vals(keys,'rhr'),kg=healthLatest(days,'kg',today);
+  const tot=[];
+  if(st.length)tot.push(`Steps: ${avg(st).toLocaleString('en-GB')} a day on average over ${st.length} full day${st.length>1?'s':''}`);
+  if(am.length)tot.push(`Active minutes: ${sum(am)} in total, ${avg(am)} a day on average (full days)`);
+  if(sl.length)tot.push(`Sleep: ${fmtHM(avg(sl))} a night on average over ${sl.length} night${sl.length>1?'s':''}`);
+  if(hr.length)tot.push(`Resting heart rate: ${avg(hr)} bpm on average`);
+  if(kg)tot.push(`Weight: ${kg.v} kg (last logged ${fd(kg.date)})`);
+  if(tot.length)out.push('','WEEK SO FAR',...tot);
+  return out.join('\n');
+}
+async function coachDocWrite(){
+  const tok=getCoachDocToken();if(!tok||coachDocBusy)return;
+  coachDocBusy=true;
+  const st=userData('coachdoc',{}),auth={Authorization:'Bearer '+tok},text=coachWeekText();
+  try{
+    let id=st.id;
+    if(!id){
+      const q=encodeURIComponent(`name='${COACH_DOC_NAME}' and trashed=false`);
+      const j=await (await coachDocFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,{headers:auth})).json();
+      id=((j.files||[])[0]||{}).id;
+    }
+    let old=null;
+    if(id){
+      try{await coachDocFetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,{method:'PATCH',headers:Object.assign({'Content-Type':'text/plain; charset=UTF-8'},auth),body:text});}
+      catch(e){if(!getCoachDocToken())throw e;old=id;id=null;} // gone or can't be rewritten: make a fresh one
+    }
+    if(!id){
+      const b='daybook'+Date.now();
+      const body=`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:COACH_DOC_NAME,mimeType:'application/vnd.google-apps.document'})}\r\n--${b}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}\r\n--${b}--`;
+      id=(await (await coachDocFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:Object.assign({'Content-Type':'multipart/related; boundary='+b},auth),body})).json()).id;
+      if(old)coachDocFetch(`https://www.googleapis.com/drive/v3/files/${old}`,{method:'PATCH',headers:Object.assign({'Content-Type':'application/json'},auth),body:JSON.stringify({trashed:true})}).catch(()=>{});
+    }
+    setStore(userKey('coachdoc'),{id,written:Date.now(),err:null});
+  }catch(e){setStore(userKey('coachdoc'),Object.assign({},st,{err:e.message}));}
+  coachDocBusy=false;
+  if(currentView==='health')refreshView();
+}
+function coachDocCardHTML(){
+  if(getCoachDocToken())localStorage.setItem(`journal_coachdoc_on_${currentUser}`,'1');
+  const st=userData('coachdoc',{}),err=sessionStorage.getItem('journal_coachdoc_err');
+  let h=`<div class="graph-card" style="padding-bottom:16px"><div class="graph-title">Your coach</div>`;
+  if(!coachDocOn()||(!getCoachDocToken()&&err)){
+    return h+`<div class="graph-sub">Daybook can keep a Google Doc called <b>${esc(COACH_DOC_NAME)}</b> in your Google Drive with this week's numbers, updated in the background. Your coach project in Claude reads it with the Google Drive connector. Daybook can only see files it creates itself.${err?`<br><br><b>Last attempt didn't finish</b> (${esc(err)}).`:''}</div>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="coachDocConnect()">Turn on coach doc</button></div>`;
+  }
+  h+=`<div class="graph-sub">Keeping <b>${esc(COACH_DOC_NAME)}</b> up to date in your Google Drive with this week's numbers.</div>
+    <div class="hl-status">${coachDocBusy?'Updating…':st.written?`Doc updated ${healthAgo(st.written)}`:'Not written yet'}${coachDocBusy||!getCoachDocToken()?'':` · <a onclick="coachDocWrite()">Update now</a>`}${st.id?` · <a onclick="window.open('https://docs.google.com/document/d/${esc(st.id)}/edit','_blank')">Open doc</a>`:''}</div>`;
+  if(st.err)h+=`<div class="hl-err">${esc(st.err)}</div>`;
+  h+=`<details class="hl-how"><summary>What to put in your coach project</summary><div class="graph-sub" style="margin:8px 0 6px">Add this to the project's instructions (once):</div><div class="hl-instr">${esc(COACH_INSTRUCTION)}</div></details>
+    <div style="text-align:right;margin-top:6px"><button class="btn small" onclick="coachDocStop()">Stop updating</button></div></div>`;
+  return h;
 }
 
 // ── WORKOUTS ──
