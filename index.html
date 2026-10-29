@@ -1863,10 +1863,24 @@ function saveWorkouts(patch){const w=Object.assign(workoutsData(),patch);w.updat
 function wkFind(id){return (workoutsData().list||[]).find(w=>w.id===id);}
 function fmtDur(s){s=Math.max(0,Math.round(s||0));const m=Math.floor(s/60),ss=s%60;return m?`${m}:${String(ss).padStart(2,'0')}`:`${ss}s`;}
 function wkSafeUrl(u){u=(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return u;}
+// Built-in workouts. Each is added once per user (tracked in seededIds), so adding a new one
+// here reaches existing users, and deleting one doesn't bring it back.
+const WK_BUILTINS=[
+  ()=>({id:'barre1',name:'Barre workout',builtin:true,activities:BARRE.EX.map((x,i)=>({id:'ba'+i,name:x.n,desc:x.d,media:{type:'anim',anim:i},duration:40}))}),
+  ()=>({id:'skifeet1',name:'Ski feet & ankles',builtin:true,activities:[
+    {id:'sf0',name:'The Alphabet',desc:'To loosen up before these exercises. Sitting in a chair, extend one leg, toes pointed, and “write” each letter of the alphabet in the air with your big toe. Don’t get sloppy after a few letters; do each one slowly and correctly. Repeat with your other foot.',media:{type:'none'},duration:180},
+    {id:'sf1',name:'Heel walk',desc:'Walk on your heels only. Think about doing heel-side turns on the slope – you’re working the same muscle on the outside front of your leg (the anterior tibialis).',media:{type:'none'},duration:60},
+    {id:'sf2',name:'Toe walk',desc:'Get up on your toes and the balls of your feet, and walk. Pressed for time? Work it into your day on the way upstairs – just stay on the balls of your feet. Works your calves and the soleus muscles underneath, much like traversing a hill on your toe-side edge.',media:{type:'none'},duration:60},
+    {id:'sf3',name:'Edge walk – outside edges',desc:'Pace on the outside edges of your feet. Roll your ankles as far as you can and keep your knees straight. Builds flexibility and strength in your feet and ankles – crucial for shock absorption and stability on the slopes.',media:{type:'none'},duration:300},
+    {id:'sf4',name:'Edge walk – inside edges',desc:'Now pace on the inside edges of your feet. Roll your ankles as far as you can and keep your knees straight.',media:{type:'none'},duration:300}
+  ]})
+];
 function ensureWorkoutsSeeded(){
-  const w=workoutsData();if(w.seeded)return;
-  const barre={id:'barre1',name:'Barre workout',builtin:true,activities:BARRE.EX.map((x,i)=>({id:'ba'+i,name:x.n,desc:x.d,media:{type:'anim',anim:i},duration:40}))};
-  saveWorkouts({list:(w.list||[]).concat([barre]),seeded:true});
+  const w=workoutsData();
+  const done=w.seededIds||(w.seeded?['barre1']:[]);
+  const add=WK_BUILTINS.map(f=>f()).filter(x=>!done.includes(x.id));
+  if(!add.length&&w.seededIds)return;
+  saveWorkouts({list:(w.list||[]).concat(add),seeded:true,seededIds:done.concat(add.map(x=>x.id))});
 }
 function wkStopAll(){if(wkTimerInt){clearInterval(wkTimerInt);wkTimerInt=null;}if(wkBarreCtl){wkBarreCtl.destroy();wkBarreCtl=null;}document.querySelectorAll('#view [data-blob-url]').forEach(e=>{try{URL.revokeObjectURL(e.dataset.blobUrl);}catch(_){}});}
 function renderWorkouts(el){
