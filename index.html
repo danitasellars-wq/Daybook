@@ -328,7 +328,7 @@ input::placeholder,textarea::placeholder{font-style:normal}
 /* ===== GRAPHS ===== */
 .hl-status{font-size:.78rem;color:var(--muted);margin:-4px 0 6px}
 .hl-status a{color:var(--accent);cursor:pointer;text-decoration:underline}
-.hl-err{font-size:.8rem;color:var(--danger,#b4462f);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.4}
+.hl-err{white-space:pre-line;font-size:.8rem;color:var(--danger,#b4462f);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.4}
 .hl-day{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-family:var(--serif);font-size:1.15rem;font-weight:700}
 .hl-how summary{font-size:.82rem;color:var(--accent);cursor:pointer;margin-top:8px}
 .hl-instr{font-size:.8rem;line-height:1.45;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px;user-select:all;-webkit-user-select:all}
@@ -1818,14 +1818,39 @@ async function healthRollup(type,start,end,maxDays){
   }
   return out;
 }
-async function healthList(type,filter,pageSize){
+async function healthList(type,filter,pageSize,verb){
   const out=[];let pageToken='';
   do{
     const q=new URLSearchParams({filter,pageSize:String(pageSize)});if(pageToken)q.set('pageToken',pageToken);
-    const j=await healthFetch(HEALTH_API+type+'/dataPoints?'+q.toString());
+    const j=await healthFetch(HEALTH_API+type+'/dataPoints'+(verb||'')+'?'+q.toString());
     out.push(...(j.dataPoints||[]));pageToken=j.nextPageToken||'';
   }while(pageToken&&out.length<1000);
   return out;
+}
+// Sleep: Google recommends :reconcile for sleep (it merges overlapping sources, e.g. watch and
+// phone, instead of double-counting). Falls back to the plain list and to the physical end-time
+// filter if a combination is refused.
+async function healthSleepPoints(start){
+  const civil=`sleep.interval.civil_end_time >= "${dkey(start)}"`,phys=`sleep.interval.end_time >= "${start.toISOString()}"`;
+  let last;
+  for(const [verb,f] of [[':reconcile',civil],['',civil],[':reconcile',phys],['',phys]]){
+    try{return await healthList('sleep',f,25,verb);}catch(e){last=e;if(!getHealthToken())break;}
+  }
+  throw last;
+}
+// One sleep session → the day you woke up, minutes asleep and stage minutes. Uses the summary
+// when Google has finished processing it, otherwise works it out from the stages or the times.
+function healthSleepSession(s){
+  if(!s||!s.interval)return null;
+  const iv=s.interval,mins=(a,b)=>(new Date(b)-new Date(a))/60000;
+  const k=hKey(iv.civilEndTime&&iv.civilEndTime.date)||(iv.endTime?dkey(new Date(iv.endTime)):null);if(!k)return null;
+  const stages={};
+  [].concat((s.summary&&s.summary.stagesSummary)||[]).forEach(st=>{stages[st.type]=+st.minutes||0;});
+  if(!Object.keys(stages).length)[].concat(s.stages||[]).forEach(st=>{if(st.startTime&&st.endTime)stages[st.type]=(stages[st.type]||0)+Math.round(mins(st.startTime,st.endTime));});
+  let asleep=s.summary&&s.summary.minutesAsleep!=null?+s.summary.minutesAsleep:null;
+  if(asleep==null&&Object.keys(stages).length)asleep=['LIGHT','DEEP','REM','ASLEEP'].reduce((a,t)=>a+(stages[t]||0),0);
+  if(asleep==null&&iv.startTime&&iv.endTime)asleep=Math.round(mins(iv.startTime,iv.endTime))-(+((s.summary||{}).minutesAwake)||0);
+  return {k,asleep:Math.max(0,asleep||0),stages,main:!!(s.metadata&&s.metadata.mainSleep),start:iv.startTime||'',len:iv.startTime&&iv.endTime?mins(iv.startTime,iv.endTime):0};
 }
 async function healthSync(){
   if(healthBusy||!getHealthToken())return;
@@ -1845,21 +1870,24 @@ async function healthSync(){
     healthRollup('total-calories',start,end,14).then(r=>r.forEach(p=>p.totalCalories&&put(rk(p),'kcal',Math.round(p.totalCalories.kcalSum)))),
     healthRollup('weight',start,end,90).then(r=>r.forEach(p=>p.weight&&p.weight.weightGramsAvg&&put(rk(p),'kg',Math.round(p.weight.weightGramsAvg/100)/10))),
     healthList('daily-resting-heart-rate',`daily_resting_heart_rate.date >= "${from}"`,100).then(r=>r.forEach(p=>{const x=p.dailyRestingHeartRate;if(x)put(hKey(x.date),'rhr',+x.beatsPerMinute);})),
-    healthList('sleep',`sleep.interval.civil_end_time >= "${from}"`,25).then(r=>{
-      // a night counts on the day you woke up; naps add to the total
-      const nights={};
+    healthSleepPoints(start).then(r=>{
+      // a night counts on the day you woke up; naps add to the total; stages come from the main sleep
+      const nights={},seen={};
       r.forEach(p=>{
-        const s=p.sleep;if(!s||!s.summary||!s.interval)return;
-        const k=hKey(s.interval.civilEndTime&&s.interval.civilEndTime.date);if(!k)return;
-        const n=nights[k]=nights[k]||{min:0,stages:null};n.min+=+s.summary.minutesAsleep||0;
-        if(s.metadata&&s.metadata.mainSleep){n.stages={};[].concat(s.summary.stagesSummary||[]).forEach(st=>{n.stages[st.type]=+st.minutes||0;});}
+        const x=healthSleepSession(p.sleep);if(!x||(x.start&&seen[x.start]))return;seen[x.start]=1;
+        const n=nights[x.k]=nights[x.k]||{min:0,best:null};n.min+=x.asleep;
+        if(Object.keys(x.stages).length&&(!n.best||x.main&&!n.best.main||x.main===n.best.main&&x.len>n.best.len))n.best=x;
       });
-      Object.keys(nights).forEach(k=>{put(k,'sleepMin',nights[k].min);if(nights[k].stages)days[k].stages=nights[k].stages;});
+      Object.keys(nights).forEach(k=>{put(k,'sleepMin',nights[k].min);if(nights[k].best)days[k].stages=nights[k].best.stages;});
     })
   ];
+  const labels=['Steps','Distance','Active minutes','Calories','Weight','Resting heart rate','Sleep'];
   const res=await Promise.allSettled(jobs);
-  const fails=res.filter(x=>x.status==='rejected');
-  if(fails.length)healthErr=fails[0].reason&&fails[0].reason.message||'Could not reach Google Health.';
+  const fails=res.map((x,i)=>x.status==='rejected'?`${labels[i]}: ${(x.reason&&x.reason.message)||'could not reach Google Health'}`:null).filter(Boolean);
+  if(fails.length){
+    healthErr=fails.join('\n');
+    if(/scope|permission/i.test(healthErr))healthErr+='\nTap Disconnect Fitbit at the bottom, then Connect Fitbit again and tick every box Google shows.';
+  }
   if(fails.length<jobs.length){hd.fetched=Date.now();setStore(userKey('health'),hd);}
   healthBusy=false;
   if(fails.length<jobs.length)coachDocWrite();
