@@ -1919,6 +1919,21 @@ function healthSleepSession(s){
   if(asleep==null&&iv.startTime&&iv.endTime)asleep=Math.round(mins(iv.startTime,iv.endTime))-(+((s.summary||{}).minutesAwake)||0);
   return {k,asleep:Math.max(0,asleep||0),stages,main:!!(s.metadata&&s.metadata.mainSleep),start:iv.startTime||'',len:iv.startTime&&iv.endTime?mins(iv.startTime,iv.endTime):0};
 }
+// Calories eaten per day. Tries the daily roll-up, then the individual food logs (list, then
+// reconcile); throws the first refusal Google gave if none of them work.
+async function healthFood(start,end){
+  const tries=[
+    async()=>{const out={};(await healthRollup('nutrition-log',start,end,90)).forEach(p=>{const e=p.nutritionLog&&p.nutritionLog.energy;const k=hKey(p.civilStartTime&&p.civilStartTime.date);if(k&&e&&e.kcalSum)out[k]=e.kcalSum;});return out;},
+    ...['',':reconcile'].map(verb=>async()=>{
+      const out={},pts=await healthList('nutrition-log',`nutrition_log.interval.civil_start_time >= "${dkey(start)}"`,1000,verb);
+      pts.forEach(p=>{const n=p.nutritionLog;if(!n||!n.energy||!n.interval)return;const iv=n.interval;const k=hKey(iv.civilStartTime&&iv.civilStartTime.date)||(iv.startTime?dkey(new Date(iv.startTime)):null);if(k)out[k]=(out[k]||0)+(+n.energy.kcal||0);});
+      return out;
+    })
+  ];
+  let first=null;
+  for(const t of tries){try{const out=await t();if(Object.keys(out).length||!first)return out;}catch(e){first=first||e;if(!getHealthToken())break;}}
+  throw first;
+}
 async function healthSync(){
   if(healthBusy||!getHealthToken())return;
   healthBusy=true;healthErr=null;healthAttempt=Date.now();if(currentView==='health')refreshView();
@@ -1950,8 +1965,8 @@ async function healthSync(){
   ];
   // Food: Google Health has no read-only nutrition permission, so this may well be refused;
   // then calories eaten are typed in on the Health tab instead.
-  const food=healthRollup('nutrition-log',start,end,90).then(r=>{
-    hd.food='ok';r.forEach(p=>{const e=p.nutritionLog&&p.nutritionLog.energy;if(e&&e.kcalSum)put(rk(p),'eaten',Math.round(e.kcalSum));});
+  const food=healthFood(start,end).then(byDay=>{
+    hd.food='ok';hd.foodMsg=null;Object.keys(byDay).forEach(k=>put(k,'eaten',Math.round(byDay[k])));
   },e=>{hd.food='refused';hd.foodMsg=e.message;});
   const labels=['Steps','Distance','Active minutes','Calories','Weight','Resting heart rate','Sleep'];
   const res=await Promise.allSettled(jobs);await food;
@@ -2055,7 +2070,7 @@ function deficitCardHTML(){
     const avg=Math.round(logged.reduce((a,r)=>a+r.burned-r.eaten,0)/logged.length),met=logged.filter(r=>r.burned-r.eaten>=DEFICIT_GOAL).length;
     sum=`<div class="def-sum"><b>${avg>=0?avg.toLocaleString('en-GB')+' kcal':'−'+Math.abs(avg).toLocaleString('en-GB')+' kcal'}</b> average deficit · goal met on <b>${met} of ${logged.length}</b> logged day${logged.length>1?'s':''}</div>`;
   }
-  const src=hd.food==='refused'?`Google Health doesn't share food logs with other apps, so tap <b>Calories eaten</b> above to type each day's total.`:logged.length?'':`Log your food in the Fitbit app, or tap <b>Calories eaten</b> above to type it in.`;
+  const src=hd.food==='refused'?`Google Health wouldn't share your food log${hd.foodMsg?` (Google said: “${esc(hd.foodMsg)}”)`:''}, so tap <b>Calories eaten</b> above to type each day's total.`:logged.length?'':`Log your food in the Fitbit app, or tap <b>Calories eaten</b> above to type it in.`;
   return `<div class="graph-card"><div class="graph-title">Calorie deficit</div>
     <div class="graph-sub">Goal: eat ${DEFICIT_GOAL} kcal less than you burn. Full days only.${src?' '+src:''}</div>
     <div class="def-legend"><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed</span></div>
