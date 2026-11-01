@@ -341,6 +341,12 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .graph-title{font-family:var(--serif);font-size:1.25rem;font-weight:700;margin-bottom:2px}
 .graph-sub{font-size:.8rem;color:var(--muted);margin-bottom:10px;line-height:1.4}
 .line-chart{width:100%;height:auto;display:block;overflow:visible}
+.lc-wrap{position:relative;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.lc-wrap .dot-hi{fill:var(--bg);stroke:var(--accent);stroke-width:2.5;opacity:0}
+.lc-wrap.holding .dot-hi{opacity:1}
+.lc-tip{display:none;position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:8px;padding:5px 9px;font-size:.74rem;line-height:1.3;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}
+.lc-tip b{display:block;font-size:.86rem}
+.lc-tip span{opacity:.8}
 .line-chart .ln{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .line-chart .dot{fill:var(--accent)}
 .line-chart .grid{stroke:var(--line);stroke-width:1}
@@ -1646,16 +1652,22 @@ let graphPeriod='weekly'; // weekly | monthly | yearly
 function weekMonday(d){const dt=new Date(d.getFullYear(),d.getMonth(),d.getDate());const day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);return dkey(dt);}
 function bucketKey(dateStr,period){const d=parseKey(dateStr);if(period==='daily')return dateStr;if(period==='yearly')return String(d.getFullYear());if(period==='monthly')return dateStr.slice(0,7);return weekMonday(d);}
 function bucketLabel(key,period){if(period==='yearly')return key;if(period==='monthly'){const p=key.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'short'});}const d=parseKey(key);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function bucketTip(key,period){
+  if(period==='yearly')return key;
+  if(period==='monthly'){const p=key.split('-');return new Date(+p[0],+p[1]-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});}
+  const d=parseKey(key).toLocaleDateString('en-GB',{weekday:period==='daily'?'short':undefined,day:'numeric',month:'short',year:'numeric'});
+  return period==='daily'?d:'Week of '+d;
+}
 function scoreSeries(period){
   const cards=scorecardData().cards||[];
   const buckets={};
   cards.forEach(c=>{const key=bucketKey(c.date,period);(buckets[key]=buckets[key]||[]).push(scoreCard(c).net);});
-  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:Math.round((buckets[k].reduce((a,b)=>a+b,0)/buckets[k].length)*10)/10})).slice(-12);
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),tip:bucketTip(k,period),value:Math.round((buckets[k].reduce((a,b)=>a+b,0)/buckets[k].length)*10)/10})).slice(-12);
 }
 function intentionSeries(period){
   const all=getEntriesRaw();const buckets={};
   Object.keys(all).forEach(k=>{const e=all[k];if(!e||e.deleted)return;if(e.done!==true&&e.done!==false)return;const key=bucketKey(k,period);const b=(buckets[key]=buckets[key]||{t:0,n:0});if(e.done===true)b.t++;b.n++;});
-  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:Math.round((buckets[k].t/buckets[k].n)*100)})).slice(-12);
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),tip:bucketTip(k,period),value:Math.round((buckets[k].t/buckets[k].n)*100)})).slice(-12);
 }
 // Inline SVG line chart. points=[{label,value}]; opts {min,max,suffix}
 function lineChartSVG(points,opts){
@@ -1678,20 +1690,60 @@ function lineChartSVG(points,opts){
   const n=points.length;
   const step=Math.ceil(n/6);
   const xlabels=points.map((p,idx)=>{if(n>6&&idx!==n-1&&(idx%step!==0||n-1-idx<step))return '';return `<text class="xl" x="${x(idx)}" y="${H-10}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${grid}<polyline class="ln" points="${line}"/>${dots}${xlabels}</svg>`;
+  const pts=points.map((p,idx)=>[Math.round(x(idx)*10)/10,Math.round(y(p.value)*10)/10,p.tip||p.label,opts.fmt?opts.fmt(p.value):p.value.toLocaleString('en-GB')+suffix]);
+  return `<div class="lc-wrap" data-w="${W}" data-pts="${esc(JSON.stringify(pts))}"><svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${grid}<polyline class="ln" points="${line}"/>${dots}${xlabels}<circle class="dot-hi" r="5" cx="-20" cy="-20"/></svg><div class="lc-tip"></div></div>`;
 }
+// Press and hold a chart to see the date and value of the nearest point; slide sideways to move.
+// The chart keeps vertical scrolling (touch-action: pan-y), so a quick swipe still scrolls the page.
+(function(){
+  let wrap=null,pts=null,timer=null,startX=0,startY=0;
+  const show=e=>{
+    if(!wrap)return;
+    const r=wrap.getBoundingClientRect(),k=r.width/(+wrap.dataset.w),px=e.clientX-r.left;
+    let best=pts[0];pts.forEach(p=>{if(Math.abs(p[0]*k-px)<Math.abs(best[0]*k-px))best=p;});
+    const hi=wrap.querySelector('.dot-hi'),tip=wrap.querySelector('.lc-tip');
+    hi.setAttribute('cx',best[0]);hi.setAttribute('cy',best[1]);
+    tip.innerHTML=`<b>${esc(best[3])}</b><span>${esc(best[2])}</span>`;
+    tip.style.display='block';
+    const tw=tip.offsetWidth;tip.style.left=Math.max(0,Math.min(r.width-tw,best[0]*k-tw/2))+'px';
+    tip.style.top=Math.max(0,best[1]*k-tip.offsetHeight-12)+'px';
+    wrap.classList.add('holding');
+  };
+  const end=()=>{clearTimeout(timer);timer=null;if(!wrap)return;const w=wrap;wrap=null;setTimeout(()=>{if(wrap!==w){w.classList.remove('holding');const t=w.querySelector('.lc-tip');if(t)t.style.display='none';}},1200);};
+  document.addEventListener('pointerdown',e=>{
+    const w=e.target.closest&&e.target.closest('.lc-wrap');if(!w)return;
+    try{pts=JSON.parse(w.dataset.pts);}catch(_){return;}if(!pts.length)return;
+    document.querySelectorAll('.lc-wrap.holding').forEach(o=>{if(o!==w){o.classList.remove('holding');o.querySelector('.lc-tip').style.display='none';}});
+    wrap=w;startX=e.clientX;startY=e.clientY;
+    if(e.pointerType==='mouse'){show(e);return;}
+    clearTimeout(timer);timer=setTimeout(()=>{timer=null;show(e);},300);
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!wrap)return;
+    if(timer){if(Math.abs(e.clientX-startX)>8||Math.abs(e.clientY-startY)>8){clearTimeout(timer);timer=null;wrap=null;}return;}
+    show(e);
+  });
+  document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
+  document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.lc-wrap'))e.preventDefault();});
+})();
 function starsSeries(period){
   const log=(starsData().log||[]).filter(l=>l.type==='earn');
   const buckets={};
   log.forEach(l=>{if(!l.at)return;const key=bucketKey(dkey(new Date(l.at)),period);buckets[key]=(buckets[key]||0)+(l.stars||0);});
-  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),value:buckets[k]})).slice(-12);
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),tip:bucketTip(k,period),value:buckets[k]})).slice(-12);
+}
+function spentSeries(period){
+  const log=(starsData().log||[]).filter(l=>l.type==='spend');
+  const buckets={};
+  log.forEach(l=>{if(!l.at)return;const key=bucketKey(dkey(new Date(l.at)),period);buckets[key]=(buckets[key]||0)+(l.stars||0);});
+  return Object.keys(buckets).sort().map(k=>({label:bucketLabel(k,period),tip:bucketTip(k,period),value:buckets[k]})).slice(-12);
 }
 function balanceSeries(period){
   const log=(starsData().log||[]).filter(l=>l.at).slice().sort((a,b)=>a.at-b.at);
   if(!log.length)return [];
   const bucketEnd={};let bal=0;
   log.forEach(l=>{bal+=(l.type==='spend'?-(l.stars||0):(l.stars||0));bucketEnd[bucketKey(dkey(new Date(l.at)),period)]=bal;});
-  return Object.keys(bucketEnd).sort().map(k=>({label:bucketLabel(k,period),value:bucketEnd[k]})).slice(-12);
+  return Object.keys(bucketEnd).sort().map(k=>({label:bucketLabel(k,period),tip:bucketTip(k,period),value:bucketEnd[k]})).slice(-12);
 }
 function habitTotals(){
   const d=scorecardData(),cards=d.cards||[];
@@ -1741,11 +1793,16 @@ function renderGraphs(el){
     ${lineChartSVG(intentP,{min:0,max:100,suffix:'%'})}
   </div>`;
   if(starsAllowed()){
-    const starsP=starsSeries(graphPeriod),balP=balanceSeries(graphPeriod);
+    const starsP=starsSeries(graphPeriod),spentP=spentSeries(graphPeriod),balP=balanceSeries(graphPeriod);
     h+=`<div class="graph-card">
     <div class="graph-title">Stars earned</div>
     <div class="graph-sub">Stars earned per ${grp}${starsP.length?'':' — earn some stars to start the line'}</div>
     ${lineChartSVG(starsP,{min:0})}
+  </div>
+  <div class="graph-card">
+    <div class="graph-title">Stars used</div>
+    <div class="graph-sub">Stars spent on rewards per ${grp}${spentP.length?'':' — redeem a reward to start the line'}</div>
+    ${lineChartSVG(spentP,{min:0})}
   </div>
   <div class="graph-card">
     <div class="graph-title">Star balance</div>
@@ -1927,9 +1984,9 @@ function healthSeries(days,f){
   if(healthRange===90){
     const b={};
     for(let i=89;i>=0;i--){const k=dkey(addDays(today,-i));const d=days[k];if(!d||d[f.k]==null)continue;const w=weekMonday(parseKey(k));(b[w]=b[w]||[]).push(d[f.k]);}
-    Object.keys(b).sort().forEach(w=>{const avg=b[w].reduce((a,c)=>a+c,0)/b[w].length;out.push({label:bucketLabel(w,'weekly'),value:f.chart?f.chart(avg):Math.round(avg*10)/10});});
+    Object.keys(b).sort().forEach(w=>{const avg=b[w].reduce((a,c)=>a+c,0)/b[w].length;out.push({label:bucketLabel(w,'weekly'),tip:bucketTip(w,'weekly'),value:f.chart?f.chart(avg):Math.round(avg*10)/10});});
   }else{
-    for(let i=healthRange-1;i>=0;i--){const k=dkey(addDays(today,-i));const d=days[k];if(!d||d[f.k]==null)continue;out.push({label:bucketLabel(k,'daily'),value:f.chart?f.chart(d[f.k]):d[f.k]});}
+    for(let i=healthRange-1;i>=0;i--){const k=dkey(addDays(today,-i));const d=days[k];if(!d||d[f.k]==null)continue;out.push({label:bucketLabel(k,'daily'),tip:bucketTip(k,'daily'),value:f.chart?f.chart(d[f.k]):d[f.k]});}
   }
   return out;
 }
@@ -1964,7 +2021,7 @@ function renderHealth(el){
   </span></div>`;
   HEALTH_FIELDS.forEach(f=>{
     const s=healthSeries(days,f);
-    h+=`<div class="graph-card"><div class="graph-title">${f.l}</div><div class="graph-sub">${healthRange===90?'Weekly average':'Per day'}</div>${lineChartSVG(s,{min:f.min,suffix:f.suffix})}</div>`;
+    h+=`<div class="graph-card"><div class="graph-title">${f.l}</div><div class="graph-sub">${healthRange===90?'Weekly average':'Per day'}</div>${lineChartSVG(s,{min:f.min,suffix:f.suffix,fmt:f.chart?(v=>fmtHM(v*60)):(v=>f.f(v))})}</div>`;
   });
   h+=`<div style="text-align:center;margin:6px 0 10px"><button class="btn" onclick="disconnectHealth()">Disconnect Fitbit</button></div>`;
   el.innerHTML=h;
