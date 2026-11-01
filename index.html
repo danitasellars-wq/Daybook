@@ -342,6 +342,8 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .def-sum{font-size:.82rem;margin:0 0 6px}
 .line-chart .ln-target{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.6}
 .line-chart .dot.over{fill:var(--bg);stroke:var(--accent);stroke-width:1.5}
+.hl-nudge{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;margin:2px 0 12px;font-size:.84rem;cursor:pointer}
+.hl-nudge b{color:var(--accent);white-space:nowrap}
 .hl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .hl-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;min-width:0}
 .hl-tile .l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
@@ -586,7 +588,8 @@ function enterApp(sub,email,name){
   viewDate=dkey(new Date());
   document.getElementById('header-date').textContent=fmtLong(new Date());
   setupFileInputs();
-  showView(healthReturn?'health':'today');
+  showView(healthReturn||new URLSearchParams(location.search).get('open')==='health'?'health':'today');
+  if(navigator.serviceWorker)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'&&e.data.view)showView(e.data.view);});
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   migrateInlinePhotos().then(changed=>{if(changed)refreshView(true);}).catch(()=>{});
   setupReminderSW();
@@ -951,6 +954,7 @@ async function mirrorReminders(s){
   try{
     const cur=(await remGet('state'))||{reminders:[],lastFired:{}};
     cur.reminders=(s.reminders||[]).map(r=>({id:r.id,label:r.label,time:r.time,days:r.days,enabled:r.enabled}));
+    const fr=foodReminder(s);cur.food={enabled:fr.enabled&&healthOn(),time:fr.time,logged:foodLoggedToday()?dkey(new Date()):null};
     await remSet('state',cur);
     checkDueRemindersForeground();
   }catch(e){}
@@ -974,9 +978,12 @@ async function checkDueRemindersForeground(){
     if(!reg)return;
     const state=(await remGet('state'))||{reminders:[],lastFired:{}};
     const reminders=state.reminders||[];
-    if(!reminders.length)return;
     const now=new Date(),dk=dkey(now),mins=now.getHours()*60+now.getMinutes();
     let changed=false;
+    if(foodDue()&&state.lastFired.food!==dk){
+      await reg.showNotification('Daybook',{body:FOOD_REMINDER_TEXT,icon:'icon.svg',tag:'daybook-food',data:{open:'health'}});
+      state.lastFired.food=dk;changed=true;
+    }
     for(const r of reminders){
       if(!r.enabled)continue;
       if(!(r.days||[]).includes(now.getDay()))continue;
@@ -1052,7 +1059,7 @@ const NAV_STAR=[['scorecard','Scorecard','<svg viewBox="0 0 24 24"><rect x="4" y
 function renderBottomNav(){
   const set=STAR_VIEWS.includes(currentView)?NAV_STAR:NAV_JOURNAL;
   const nav=document.getElementById('bottom-nav');if(!nav)return;
-  nav.innerHTML=set.map(([v,label,icon])=>`<button class="nav-btn ${v===currentView?'active':''}" data-v="${v}" onclick="showView('${v}')">${v==='scorecard'?'<span class="nav-due" id="habits-due" style="display:none"></span>':''}${icon}${label}</button>`).join('');
+  nav.innerHTML=set.map(([v,label,icon])=>`<button class="nav-btn ${v===currentView?'active':''}" data-v="${v}" onclick="showView('${v}')">${v==='scorecard'?'<span class="nav-due" id="habits-due" style="display:none"></span>':''}${v==='health'?`<span class="nav-due" style="display:${foodDue()?'block':'none'}"></span>`:''}${icon}${label}</button>`).join('');
 }
 function updateHeader(){
   const sub=document.getElementById('header-date');if(!sub)return;
@@ -1526,7 +1533,7 @@ function scoreCard(card){let g=0,n=0,b=0;const r=(card&&card.ratings)||{};Object
 function scCardsSorted(){return (scorecardData().cards||[]).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:(b.at||0)-(a.at||0)));}
 function scCurrentPeriodCard(){const d=scorecardData();if(d.cadence==='none')return null;const pk=scPeriodKey(dkey(new Date()),d.cadence);return (d.cards||[]).find(c=>scPeriodKey(c.date,d.cadence)===pk)||null;}
 function scorecardDue(){const d=scorecardData();if(!d.cadence||d.cadence==='none'||!(d.habits||[]).length)return false;return !scCurrentPeriodCard();}
-function updateScorecardDue(){const due=scorecardDue();const t=document.getElementById('habits-due');if(t)t.style.display=due?'block':'none';const f=document.getElementById('fab-due');if(f)f.style.display=due?'block':'none';}
+function updateScorecardDue(){const due=scorecardDue();const t=document.getElementById('habits-due');if(t)t.style.display=due?'block':'none';const f=document.getElementById('fab-due');if(f)f.style.display=due||foodDue()?'block':'none';}
 function scNetHtml(net){const sign=net>0?'+':'';const cls=net>0?'pos':net<0?'neg':'zero';return {sign,cls};}
 function renderScorecard(el){
   ensureScorecardSeeded();
@@ -2027,6 +2034,22 @@ function healthAgo(t){if(!t)return 'never';const m=Math.round((Date.now()-t)/600
 // will share it, otherwise from what you type in (typed values win, and stay on this device).
 const DEFICIT_GOAL=500;
 function intakeData(){return userData('intake',{});}
+// Evening reminder to type in today's calories eaten — only while today's total is still blank.
+const FOOD_REMINDER_TEXT="Evening check-in: add today's calories eaten so your deficit graph stays up to date.";
+function foodReminder(s){return Object.assign({enabled:true,time:'20:00'},(s||settingsData()).foodReminder||{});}
+function foodLoggedToday(){return healthEaten(dkey(new Date()))!=null;}
+function foodDue(){
+  const r=foodReminder();if(!r.enabled||!healthOn()||foodLoggedToday())return false;
+  const [h,m]=r.time.split(':').map(Number),n=new Date();return n.getHours()*60+n.getMinutes()>=h*60+m;
+}
+function fmtClock(t){const [h,m]=t.split(':').map(Number);return new Date(2000,0,1,h,m).toLocaleTimeString('en-GB',{hour:'numeric',minute:'2-digit',hour12:true}).replace(' ','');}
+function setFoodReminderTime(){
+  const v=prompt('Remind me at what time? (24-hour, e.g. 20:00)',foodReminder().time);if(v===null)return;
+  const m=String(v).trim().match(/^(\d{1,2})[:.]?(\d{2})$/);if(!m||+m[1]>23||+m[2]>59){alert('Please use a time like 20:00.');return;}
+  saveSettings({foodReminder:Object.assign(foodReminder(),{time:String(+m[1]).padStart(2,'0')+':'+m[2],enabled:true})});showView('health');
+}
+function toggleFoodReminder(){const r=foodReminder();saveSettings({foodReminder:Object.assign(r,{enabled:!r.enabled})});showView('health');}
+async function allowFoodNotifs(){if(!('Notification' in window)){alert('Notifications are not supported in this browser.');return;}await Notification.requestPermission();showView('health');checkDueRemindersForeground();}
 function healthEaten(k){const m=intakeData()[k];return m!=null?m:((healthData().days[k]||{}).eaten);}
 function setIntake(k){
   const cur=intakeData()[k],lbl=parseKey(k).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
@@ -2034,7 +2057,7 @@ function setIntake(k){
   if(v===null)return;
   const n=parseInt(String(v).replace(/[^0-9]/g,''),10),d=intakeData();
   if(n>0)d[k]=n;else delete d[k];
-  setStore(userKey('intake'),d);showView('health');coachDocWrite();
+  setStore(userKey('intake'),d);mirrorReminders(settingsData());showView('health');coachDocWrite();
 }
 function deficitRows(){
   const days=healthData().days,today=new Date(),rows=[];
@@ -2073,6 +2096,8 @@ function deficitCardHTML(){
   const src=hd.food==='refused'?`Google Health wouldn't share your food log${hd.foodMsg?` (Google said: “${esc(hd.foodMsg)}”)`:''}, so tap <b>Calories eaten</b> above to type each day's total.`:logged.length?'':`Log your food in the Fitbit app, or tap <b>Calories eaten</b> above to type it in.`;
   return `<div class="graph-card"><div class="graph-title">Calorie deficit</div>
     <div class="graph-sub">Goal: eat ${DEFICIT_GOAL} kcal less than you burn. Full days only.${src?' '+src:''}</div>
+    <div class="hl-status">Evening reminder: ${(()=>{const r=foodReminder(),np='Notification' in window&&Notification.permission!=='granted';
+      return r.enabled?`<a onclick="setFoodReminderTime()">${fmtClock(r.time)}</a> · <a onclick="toggleFoodReminder()">turn off</a>${np?' · <a onclick="allowFoodNotifs()">allow notifications</a>':''}`:`off · <a onclick="toggleFoodReminder()">turn on</a>`;})()}</div>
     <div class="def-legend"><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed</span></div>
     ${sum}${deficitChartSVG(rows)}</div>`;
 }
@@ -2090,6 +2115,7 @@ function renderHealth(el){
   const dk=healthDay||today,d=days[dk]||{};
   h+=`<div class="hl-status">${healthBusy?'Fetching from Fitbit…':`Updated ${healthAgo(hd.fetched)}`}${healthBusy?'':` · <a onclick="healthSync()">Refresh</a>`}</div>`;
   if(healthErr)h+=`<div class="hl-err">${esc(healthErr)}</div>`;
+  if(foodDue())h+=`<div class="hl-nudge" onclick="setIntake('${today}')"><span>🌙 Evening check-in — add today's calories eaten</span><b>Add</b></div>`;
   h+=`<div class="hl-day"><button class="icon-btn" onclick="healthShiftDay(-1)">‹</button><span>${dk===today?'Today':parseKey(dk).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</span><button class="icon-btn" onclick="healthShiftDay(1)" ${dk===today?'disabled style="opacity:.3"':''}>›</button></div>
   <div class="hl-tiles">${HEALTH_FIELDS.map(f=>{
     let v=d[f.k],sub=f.sub?f.sub(d):'';
