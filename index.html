@@ -332,6 +332,16 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .hl-day{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;font-family:var(--serif);font-size:1.15rem;font-weight:700}
 .hl-how summary{font-size:.82rem;color:var(--accent);cursor:pointer;margin-top:8px}
 .hl-instr{font-size:.8rem;line-height:1.45;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px;user-select:all;-webkit-user-select:all}
+.hl-tile.tap{cursor:pointer;border-style:dashed}
+.def-legend{display:flex;gap:16px;font-size:.74rem;color:var(--muted);margin:-4px 0 8px}
+.def-legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
+.def-legend i.lg-target{border-top:2px dashed var(--muted)}
+.def-legend{flex-wrap:wrap;row-gap:4px}
+.lg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin:0 4px 1px 0;vertical-align:middle}
+.lg-dot.no{background:var(--bg);border:1.5px solid var(--accent);margin-left:6px}
+.def-sum{font-size:.82rem;margin:0 0 6px}
+.line-chart .ln-target{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.6}
+.line-chart .dot.over{fill:var(--bg);stroke:var(--accent);stroke-width:1.5}
 .hl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .hl-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;min-width:0}
 .hl-tile .l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
@@ -1938,8 +1948,13 @@ async function healthSync(){
       Object.keys(nights).forEach(k=>{put(k,'sleepMin',nights[k].min);if(nights[k].best)days[k].stages=nights[k].best.stages;});
     })
   ];
+  // Food: Google Health has no read-only nutrition permission, so this may well be refused;
+  // then calories eaten are typed in on the Health tab instead.
+  const food=healthRollup('nutrition-log',start,end,90).then(r=>{
+    hd.food='ok';r.forEach(p=>{const e=p.nutritionLog&&p.nutritionLog.energy;if(e&&e.kcalSum)put(rk(p),'eaten',Math.round(e.kcalSum));});
+  },e=>{hd.food='refused';hd.foodMsg=e.message;});
   const labels=['Steps','Distance','Active minutes','Calories','Weight','Resting heart rate','Sleep'];
-  const res=await Promise.allSettled(jobs);
+  const res=await Promise.allSettled(jobs);await food;
   const fails=res.map((x,i)=>x.status==='rejected'?`${labels[i]}: ${(x.reason&&x.reason.message)||'could not reach Google Health'}`:null).filter(Boolean);
   if(fails.length){
     healthErr=fails.join('\n');
@@ -1993,6 +2008,59 @@ function healthSeries(days,f){
 function setHealthRange(n){healthRange=n;showView('health');}
 function healthShiftDay(n){const t=dkey(new Date());const d=dkey(addDays(parseKey(healthDay||t),n));healthDay=d>t?t:d;showView('health');}
 function healthAgo(t){if(!t)return 'never';const m=Math.round((Date.now()-t)/60000);if(m<1)return 'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);return h<24?h+' h ago':Math.round(h/24)+' d ago';}
+// ── Calorie deficit: target = calories burned − DEFICIT_GOAL; eaten comes from Google Health if it
+// will share it, otherwise from what you type in (typed values win, and stay on this device).
+const DEFICIT_GOAL=500;
+function intakeData(){return userData('intake',{});}
+function healthEaten(k){const m=intakeData()[k];return m!=null?m:((healthData().days[k]||{}).eaten);}
+function setIntake(k){
+  const cur=intakeData()[k],lbl=parseKey(k).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const v=prompt(`Calories eaten on ${lbl}?\n(Leave empty to clear.)`,cur!=null?cur:(healthEaten(k)||''));
+  if(v===null)return;
+  const n=parseInt(String(v).replace(/[^0-9]/g,''),10),d=intakeData();
+  if(n>0)d[k]=n;else delete d[k];
+  setStore(userKey('intake'),d);showView('health');coachDocWrite();
+}
+function deficitRows(){
+  const days=healthData().days,today=new Date(),rows=[];
+  for(let i=healthRange;i>=1;i--){const k=dkey(addDays(today,-i)),d=days[k];if(!d||d.kcal==null)continue;rows.push({k,burned:d.kcal,eaten:healthEaten(k)});}
+  return rows; // full days only: today's burn isn't finished
+}
+function deficitChartSVG(rows){
+  if(!rows.length)return '<div class="empty-note" style="padding:28px 10px">No calories-burned data yet — it fills in as Fitbit syncs.</div>';
+  const W=320,H=180,padL=34,padR=10,padT=12,padB=30,n=rows.length;
+  const tg=rows.map(r=>r.burned-DEFICIT_GOAL),all=tg.concat(rows.map(r=>r.eaten).filter(v=>v!=null));
+  let min=Math.floor(Math.min(...all)*0.92/100)*100,max=Math.ceil(Math.max(...all)*1.04/100)*100;if(min===max)max+=100;
+  const plotW=W-padL-padR,plotH=H-padT-padB;
+  const x=i=>padL+(n===1?plotW/2:(i/(n-1))*plotW),y=v=>padT+plotH-((v-min)/(max-min))*plotH;
+  let g='';for(let i=0;i<=2;i++){const gv=min+(max-min)*(i/2),gy=y(gv);g+=`<line class="grid" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/><text class="yl" x="${padL-4}" y="${gy+3}" text-anchor="end">${Math.round(gv).toLocaleString('en-GB')}</text>`;}
+  const target=`<polyline class="ln ln-target" points="${tg.map((v,i)=>`${x(i)},${y(v)}`).join(' ')}"/>`;
+  let path='',pen=false;rows.forEach((r,i)=>{if(r.eaten==null){pen=false;return;}path+=`${pen?'L':'M'}${x(i)},${y(r.eaten)} `;pen=true;});
+  const dots=rows.map((r,i)=>r.eaten==null?'':`<circle class="dot ${r.burned-r.eaten>=DEFICIT_GOAL?'ok':'over'}" cx="${x(i)}" cy="${y(r.eaten)}" r="3"/>`).join('');
+  const step=Math.ceil(n/6);
+  const xl=rows.map((r,i)=>{if(n>6&&i!==n-1&&(i%step!==0||n-1-i<step))return '';return `<text class="xl" x="${x(i)}" y="${H-10}" text-anchor="middle">${esc(bucketLabel(r.k,'daily'))}</text>`;}).join('');
+  const f=v=>Math.round(v).toLocaleString('en-GB');
+  const pts=rows.map((r,i)=>{
+    const date=bucketTip(r.k,'daily');
+    if(r.eaten==null)return [Math.round(x(i)*10)/10,Math.round(y(tg[i])*10)/10,`${date} · burned ${f(r.burned)}`,`Target ${f(tg[i])} kcal`];
+    const def=r.burned-r.eaten;
+    return [Math.round(x(i)*10)/10,Math.round(y(r.eaten)*10)/10,`${date} · ate ${f(r.eaten)} · burned ${f(r.burned)}`,`${def>=0?'Deficit':'Surplus'} ${f(Math.abs(def))} kcal${def>=DEFICIT_GOAL?' ✓':''}`];
+  });
+  return `<div class="lc-wrap" data-w="${W}" data-pts="${esc(JSON.stringify(pts))}"><svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${g}${target}<path class="ln ln-eaten" d="${path}"/>${dots}${xl}<circle class="dot-hi" r="5" cx="-20" cy="-20"/></svg><div class="lc-tip"></div></div>`;
+}
+function deficitCardHTML(){
+  const rows=deficitRows(),logged=rows.filter(r=>r.eaten!=null),hd=healthData();
+  let sum='';
+  if(logged.length){
+    const avg=Math.round(logged.reduce((a,r)=>a+r.burned-r.eaten,0)/logged.length),met=logged.filter(r=>r.burned-r.eaten>=DEFICIT_GOAL).length;
+    sum=`<div class="def-sum"><b>${avg>=0?avg.toLocaleString('en-GB')+' kcal':'−'+Math.abs(avg).toLocaleString('en-GB')+' kcal'}</b> average deficit · goal met on <b>${met} of ${logged.length}</b> logged day${logged.length>1?'s':''}</div>`;
+  }
+  const src=hd.food==='refused'?`Google Health doesn't share food logs with other apps, so tap <b>Calories eaten</b> above to type each day's total.`:logged.length?'':`Log your food in the Fitbit app, or tap <b>Calories eaten</b> above to type it in.`;
+  return `<div class="graph-card"><div class="graph-title">Calorie deficit</div>
+    <div class="graph-sub">Goal: eat ${DEFICIT_GOAL} kcal less than you burn. Full days only.${src?' '+src:''}</div>
+    <div class="def-legend"><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed</span></div>
+    ${sum}${deficitChartSVG(rows)}</div>`;
+}
 function renderHealth(el){
   let h=`<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Health</div><div class="section-sub">Your Fitbit numbers, kept ready for your coach.</div></div></div>`;
   if(getHealthToken())localStorage.setItem(`journal_health_on_${currentUser}`,'1');
@@ -2012,13 +2080,19 @@ function renderHealth(el){
     let v=d[f.k],sub=f.sub?f.sub(d):'';
     if(v==null&&f.carry){const l=healthLatest(days,f.k,dk);if(l){v=l.v;sub='Logged '+parseKey(l.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});}}
     return `<div class="hl-tile"><div class="l">${f.l}</div><div class="v">${v==null?'—':f.f(v)}</div>${sub?`<div class="s">${sub}</div>`:''}</div>`;
-  }).join('')}</div>
+  }).join('')}${(()=>{
+    const ate=healthEaten(dk),typed=intakeData()[dk]!=null,burned=d.kcal;
+    let sub=ate==null?'Tap to enter':typed?'Typed in · tap to change':'From Fitbit · tap to change';
+    if(ate!=null&&burned!=null){const def=burned-ate;sub=dk===today?`${(burned-DEFICIT_GOAL-ate).toLocaleString('en-GB')} kcal left to stay on target so far`:`${def>=0?'Deficit':'Surplus'} ${Math.abs(def).toLocaleString('en-GB')} kcal${def>=DEFICIT_GOAL?' ✓':''}`;}
+    return `<div class="hl-tile tap" onclick="setIntake('${dk}')"><div class="l">Calories eaten</div><div class="v">${ate==null?'—':ate.toLocaleString('en-GB')+' kcal'}</div><div class="s">${sub}</div></div>`;
+  })()}</div>
   ${coachDocCardHTML()}
   <div class="sc-cadence"><span class="lbl">Show</span><span class="sc-seg">
     <button class="${healthRange===14?'on':''}" onclick="setHealthRange(14)">2 weeks</button>
     <button class="${healthRange===30?'on':''}" onclick="setHealthRange(30)">Month</button>
     <button class="${healthRange===90?'on':''}" onclick="setHealthRange(90)">3 months</button>
   </span></div>`;
+  h+=deficitCardHTML();
   HEALTH_FIELDS.forEach(f=>{
     const s=healthSeries(days,f);
     h+=`<div class="graph-card"><div class="graph-title">${f.l}</div><div class="graph-sub">${healthRange===90?'Weekly average':'Per day'}</div>${lineChartSVG(s,{min:f.min,suffix:f.suffix,fmt:f.chart?(v=>fmtHM(v*60)):(v=>f.f(v))})}</div>`;
@@ -2067,13 +2141,15 @@ async function coachDocFetch(url,opts){
   if(!res.ok){let msg='';try{const j=await res.json();msg=(j.error&&j.error.message)||'';}catch(e){}throw new Error(msg||'Google Drive error '+res.status);}
   return res;
 }
-function healthDayLine(d){
+function healthDayLine(d,k){
+  const ate=k?healthEaten(k):null;
   return [
     d.steps!=null?Math.round(d.steps).toLocaleString('en-GB')+' steps':null,
     d.activeMin!=null?d.activeMin+' active min'+(d.lightMin!=null?` (+${d.lightMin} light)`:''):null,
-    d.km!=null?d.km+' km':null,d.kcal!=null?d.kcal.toLocaleString('en-GB')+' kcal':null,
+    d.km!=null?d.km+' km':null,d.kcal!=null?'burned '+d.kcal.toLocaleString('en-GB')+' kcal':null,
     d.sleepMin!=null?'slept '+fmtHM(d.sleepMin)+(d.stages&&d.stages.DEEP!=null?` (deep ${fmtHM(d.stages.DEEP)}, REM ${fmtHM(d.stages.REM)})`:''):null,
-    d.rhr!=null?'resting HR '+d.rhr+' bpm':null,d.kg!=null?'weight '+d.kg+' kg':null
+    d.rhr!=null?'resting HR '+d.rhr+' bpm':null,d.kg!=null?'weight '+d.kg+' kg':null,
+    ate!=null?`ate ${ate.toLocaleString('en-GB')} kcal`+(d.kcal!=null&&k!==dkey(new Date())?` (deficit ${(d.kcal-ate).toLocaleString('en-GB')})`:''):null
   ].filter(Boolean).join(' · ');
 }
 function coachWeekText(){
@@ -2087,7 +2163,8 @@ function coachWeekText(){
     '',
     'DAY BY DAY'
   ];
-  keys.forEach(k=>out.push(`${fd(k)}${k===today?' (today, so far)':''}: ${healthDayLine(days[k]||{})||'no data'}`));
+  out.splice(3,0,`Goal: a ${DEFICIT_GOAL} kcal calorie deficit every day (calories burned minus calories eaten).`);
+  keys.forEach(k=>out.push(`${fd(k)}${k===today?' (today, so far)':''}: ${healthDayLine(days[k]||{},k)||'no data'}`));
   const vals=(ks,f)=>ks.map(k=>(days[k]||{})[f]).filter(v=>v!=null);
   const sum=a=>a.reduce((x,y)=>x+y,0),avg=a=>Math.round(sum(a)/a.length);
   const full=keys.filter(k=>k!==today),st=vals(full,'steps'),am=vals(full,'activeMin'),sl=vals(keys,'sleepMin'),hr=vals(keys,'rhr'),kg=healthLatest(days,'kg',today);
@@ -2097,6 +2174,8 @@ function coachWeekText(){
   if(sl.length)tot.push(`Sleep: ${fmtHM(avg(sl))} a night on average over ${sl.length} night${sl.length>1?'s':''}`);
   if(hr.length)tot.push(`Resting heart rate: ${avg(hr)} bpm on average`);
   if(kg)tot.push(`Weight: ${kg.v} kg (last logged ${fd(kg.date)})`);
+  const defs=full.map(k=>{const b=(days[k]||{}).kcal,a=healthEaten(k);return b!=null&&a!=null?b-a:null;}).filter(v=>v!=null);
+  if(defs.length)tot.push(`Calorie deficit: ${avg(defs)} kcal a day on average, goal met on ${defs.filter(v=>v>=DEFICIT_GOAL).length} of ${defs.length} logged day${defs.length>1?'s':''}`);
   if(tot.length)out.push('','WEEK SO FAR',...tot);
   return out.join('\n');
 }
