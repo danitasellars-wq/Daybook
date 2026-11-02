@@ -344,6 +344,12 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .line-chart .dot.over{fill:var(--bg);stroke:var(--accent);stroke-width:1.5}
 .hl-nudge{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;margin:2px 0 12px;font-size:.84rem;cursor:pointer}
 .hl-nudge b{color:var(--accent);white-space:nowrap}
+.ie-unit{color:var(--muted);font-size:.85rem;align-self:center}
+.ie-hint{font-size:.78rem;color:var(--muted);margin-top:6px;min-height:1em}
+.ie-list{max-height:34vh;overflow-y:auto;margin-top:6px;border-top:1px solid var(--line)}
+.ie-row{display:flex;justify-content:space-between;padding:9px 4px;border-bottom:1px solid var(--line);font-size:.88rem;cursor:pointer}
+.ie-row b{font-weight:600}
+.ie-row.on{background:var(--panel);color:var(--accent)}
 .hl-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .hl-tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;min-width:0}
 .hl-tile .l{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
@@ -2051,14 +2057,47 @@ function setFoodReminderTime(){
 function toggleFoodReminder(){const r=foodReminder();saveSettings({foodReminder:Object.assign(r,{enabled:!r.enabled})});showView('health');}
 async function allowFoodNotifs(){if(!('Notification' in window)){alert('Notifications are not supported in this browser.');return;}await Notification.requestPermission();showView('health');checkDueRemindersForeground();}
 function healthEaten(k){const m=intakeData()[k];return m!=null?m:((healthData().days[k]||{}).eaten);}
-function setIntake(k){
-  const cur=intakeData()[k],lbl=parseKey(k).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-  const v=prompt(`Calories eaten on ${lbl}?\n(Leave empty to clear.)`,cur!=null?cur:(healthEaten(k)||''));
-  if(v===null)return;
-  const n=parseInt(String(v).replace(/[^0-9]/g,''),10),d=intakeData();
-  if(n>0)d[k]=n;else delete d[k];
-  setStore(userKey('intake'),d);mirrorReminders(settingsData());showView('health');coachDocWrite();
+// Calories-eaten editor: pick any past date (defaults to today), type the total, and edit or
+// clear earlier days from the list of the last 14.
+function setIntake(k){openIntakeEditor(k);}
+function openIntakeEditor(k){
+  openModal(`<div class="field-label">Date</div>
+    <div class="vfield"><input type="date" id="ie-date" max="${dkey(new Date())}" onchange="ieLoad(this.value)"/></div>
+    <div class="field-label" style="margin-top:12px">Calories eaten</div>
+    <div class="vfield"><input id="ie-kcal" inputmode="numeric" autocomplete="off" placeholder="e.g. 2270" onkeydown="if(event.key==='Enter'){event.preventDefault();ieSave();}"/><span class="ie-unit">kcal</span></div>
+    <div class="ie-hint" id="ie-hint"></div>
+    <div class="tb-actions"><button class="btn primary" onclick="ieSave()">Save</button><button class="btn" id="ie-clear" onclick="ieClear()">Clear this day</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>
+    <div class="field-label" style="margin-top:18px">Last 14 days — tap a day to edit it</div>
+    <div class="ie-list" id="ie-list"></div>`,'Calories eaten');
+  ieLoad(k||dkey(new Date()));
 }
+function ieDayName(k){const t=dkey(new Date());return k===t?'Today':k===dkey(addDays(new Date(),-1))?'Yesterday':parseKey(k).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}
+function ieLoad(k){
+  const today=dkey(new Date());if(!k||k>today)k=today;
+  const di=document.getElementById('ie-date');if(!di)return;di.value=k;
+  const ate=healthEaten(k),burned=(healthData().days[k]||{}).kcal,f=v=>Math.round(v).toLocaleString('en-GB');
+  document.getElementById('ie-kcal').value=ate!=null?ate:'';
+  document.getElementById('ie-clear').style.display=intakeData()[k]!=null?'':'none';
+  document.getElementById('ie-hint').textContent=burned==null?'No calories-burned data from Fitbit for this day yet.':
+    `${k===today?'Burned so far':'Burned'}: ${f(burned)} kcal · target: ${f(burned-DEFICIT_GOAL)} kcal`+(ate!=null&&k!==today?` · ${burned-ate>=0?'deficit':'surplus'} ${f(Math.abs(burned-ate))} kcal${burned-ate>=DEFICIT_GOAL?' ✓':''}`:'');
+  document.getElementById('ie-list').innerHTML=Array.from({length:14},(_,i)=>dkey(addDays(new Date(),-i))).map(d=>{
+    const a=healthEaten(d);
+    return `<div class="ie-row${d===k?' on':''}" onclick="ieLoad('${d}')"><span>${ieDayName(d)}</span><b>${a!=null?a.toLocaleString('en-GB')+' kcal':'—'}</b></div>`;
+  }).join('');
+}
+function ieSave(){
+  const k=document.getElementById('ie-date').value,n=parseInt(String(document.getElementById('ie-kcal').value).replace(/[^0-9]/g,''),10);
+  if(!k){alert('Pick a date.');return;}
+  if(!(n>0)){alert('Enter the calories you ate, e.g. 2270.');return;}
+  const d=intakeData();d[k]=n;setStore(userKey('intake'),d);
+  const nm=ieDayName(k);showToast(`Saved ${n.toLocaleString('en-GB')} kcal for ${/^(Today|Yesterday)$/.test(nm)?nm.toLowerCase():nm}`,true);
+  intakeChanged();ieLoad(k);
+}
+function ieClear(){
+  const k=document.getElementById('ie-date').value,d=intakeData();
+  if(d[k]==null)return;delete d[k];setStore(userKey('intake'),d);intakeChanged();ieLoad(k);
+}
+function intakeChanged(){mirrorReminders(settingsData());if(currentView==='health')showView('health');coachDocWrite();}
 function deficitRows(){
   const days=healthData().days,today=new Date(),rows=[];
   for(let i=healthRange;i>=1;i--){const k=dkey(addDays(today,-i)),d=days[k];if(!d||d.kcal==null)continue;rows.push({k,burned:d.kcal,eaten:healthEaten(k)});}
@@ -2093,9 +2132,10 @@ function deficitCardHTML(){
     const avg=Math.round(logged.reduce((a,r)=>a+r.burned-r.eaten,0)/logged.length),met=logged.filter(r=>r.burned-r.eaten>=DEFICIT_GOAL).length;
     sum=`<div class="def-sum"><b>${avg>=0?avg.toLocaleString('en-GB')+' kcal':'−'+Math.abs(avg).toLocaleString('en-GB')+' kcal'}</b> average deficit · goal met on <b>${met} of ${logged.length}</b> logged day${logged.length>1?'s':''}</div>`;
   }
-  const src=hd.food==='refused'?`Google Health wouldn't share your food log${hd.foodMsg?` (Google said: “${esc(hd.foodMsg)}”)`:''}, so tap <b>Calories eaten</b> above to type each day's total.`:logged.length?'':`Log your food in the Fitbit app, or tap <b>Calories eaten</b> above to type it in.`;
+  const src=hd.food==='refused'?`Google Health wouldn't share your food log${hd.foodMsg?` (Google said: “${esc(hd.foodMsg)}”)`:''}, so add each day's total with <b>Add / edit calories eaten</b> below.`:logged.length?'':`Log your food in the Fitbit app, or add it with <b>Add / edit calories eaten</b> below.`;
   return `<div class="graph-card"><div class="graph-title">Calorie deficit</div>
     <div class="graph-sub">Goal: eat ${DEFICIT_GOAL} kcal less than you burn. Full days only.${src?' '+src:''}</div>
+    <div class="hl-status"><a onclick="openIntakeEditor()">Add / edit calories eaten</a></div>
     <div class="hl-status">Evening reminder: ${(()=>{const r=foodReminder(),np='Notification' in window&&Notification.permission!=='granted';
       return r.enabled?`<a onclick="setFoodReminderTime()">${fmtClock(r.time)}</a> · <a onclick="toggleFoodReminder()">turn off</a>${np?' · <a onclick="allowFoodNotifs()">allow notifications</a>':''}`:`off · <a onclick="toggleFoodReminder()">turn on</a>`;})()}</div>
     <div class="def-legend"><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed</span></div>
