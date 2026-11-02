@@ -602,6 +602,7 @@ function enterApp(sub,email,name){
   mirrorReminders(settingsData());
   setInterval(checkDueRemindersForeground,60000);
   setInterval(healthTick,5*60*1000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!userIsTyping())healthBoot(true);});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDueRemindersForeground();});
 }
 function signOut(){
@@ -1993,13 +1994,16 @@ async function healthSync(){
   if(fails.length<jobs.length)coachDocWrite();
   if(currentView==='health')refreshView();
 }
-// On app start (bg) and on opening the tab: reconnect silently once per session if an hour-long
-// token ran out, then refresh if stale. Returns true if it navigated away to sign in.
+// On app start, on coming back to the app (bg) and on opening the tab: reconnect silently if an
+// hour-long token ran out, then refresh if stale. Returns true if it navigated away to sign in.
+// Retries are spaced 20 minutes apart (not once per session: an installed app on Android can keep
+// one session alive for days, which left the tokens expired and the coach doc stale).
 function healthBoot(bg){
   if(!healthOn())return false;
   const silent=(key,go)=>{
-    if(sessionStorage.getItem(key+'_tried')||sessionStorage.getItem(key+'_err'))return false;
-    sessionStorage.setItem(key+'_tried','1');if(bg)sessionStorage.setItem('journal_auth_bg','1');go(false);return true;
+    if(sessionStorage.getItem(key+'_err'))return false;
+    if(Date.now()-(+localStorage.getItem(key+'_tried_at')||0)<20*60*1000)return false;
+    localStorage.setItem(key+'_tried_at',String(Date.now()));if(bg)sessionStorage.setItem('journal_auth_bg','1');go(false);return true;
   };
   if(!getHealthToken())return silent('journal_health',healthAuthRedirect);
   if(coachDocOn()&&!getCoachDocToken()&&silent('journal_coachdoc',coachDocAuthRedirect))return true;
@@ -2296,7 +2300,7 @@ function coachDocCardHTML(){
       <button class="btn primary" style="width:100%;justify-content:center" onclick="coachDocConnect()">Turn on coach doc</button></div>`;
   }
   h+=`<div class="graph-sub">Keeping <b>${esc(COACH_DOC_NAME)}</b> up to date in your Google Drive with this week's numbers.</div>
-    <div class="hl-status">${coachDocBusy?'Updating…':st.written?`Doc updated ${healthAgo(st.written)}`:'Not written yet'}${coachDocBusy||!getCoachDocToken()?'':` · <a onclick="coachDocWrite()">Update now</a>`}${st.id?` · <a onclick="window.open('https://docs.google.com/document/d/${esc(st.id)}/edit','_blank')">Open doc</a>`:''}</div>`;
+    <div class="hl-status">${coachDocBusy?'Updating…':st.written?`Doc updated ${healthAgo(st.written)}`:'Not written yet'}${coachDocBusy?'':getCoachDocToken()?` · <a onclick="coachDocWrite()">Update now</a>`:` · <a onclick="coachDocConnect()">Reconnect</a>`}${st.id?` · <a onclick="window.open('https://docs.google.com/document/d/${esc(st.id)}/edit','_blank')">Open doc</a>`:''}</div>`;
   if(st.err)h+=`<div class="hl-err">${esc(st.err)}</div>`;
   h+=`<details class="hl-how"><summary>What to put in your coach project</summary><div class="graph-sub" style="margin:8px 0 6px">Add this to the project's instructions (once):</div><div class="hl-instr">${esc(COACH_INSTRUCTION)}</div></details>
     <div style="text-align:right;margin-top:6px"><button class="btn small" onclick="coachDocStop()">Stop updating</button></div></div>`;
