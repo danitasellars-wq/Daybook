@@ -457,6 +457,9 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .sp-pill{font-size:.74rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap;font-variant-numeric:lining-nums}
 .sp-pill.ok{color:#2a7a4a;border-color:#2a7a4a;background:rgba(42,122,74,.08)}
 .sp-pill.miss{color:#a82020;border-color:#a82020;background:rgba(168,32,32,.07)}
+.sp-pill.prog{color:#8a6a14;border-color:#c99a2e;background:rgba(201,154,46,.12)}
+.sp-chip.prog{border-color:#c99a2e;color:#8a6a14;background:rgba(201,154,46,.12)}
+.sp-wk .sp-now{margin-left:8px;font-size:.66rem;font-weight:700;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 8px;vertical-align:1px}
 .sp-note{font-size:.8rem;color:var(--muted);line-height:1.5;margin:4px 2px 0}
 .sp-note b{color:var(--ink)}
 </style>
@@ -2810,10 +2813,22 @@ function sprintWeeks(){
   return out;
 }
 function sprintResults(){const sp=starsData().sprint;return (sp&&sp.weeks)||{};}
+// A logged goal is a tick as soon as its target is reached (any day), a cross only once the week has reached its last day,
+// and otherwise "in progress" — so you can log part-way through a week and top it up as you go.
+function sprintState(x,w,today){return !x?null:x.ok?'ok':(today>=w.end?'miss':'prog');}
+// Does a goal still need its final update? Only once the week has reached its last day, and only if it's empty or short
+// and hasn't been touched since that day began.
+function sprintNeeds(x,w,today){
+  if(w.end>today)return false;
+  if(!x)return true;
+  if(x.ok)return false;
+  return x.at!=null&&x.at<parseKey(w.end).getTime();
+}
+function sprintCurrentWeek(weeks,today){return weeks.find(w=>today>=w.start&&today<=w.end)||(today>SPRINT.end?weeks[weeks.length-1]:weeks[0]);}
 function sprintDue(){
   if(!starsAllowed()||!sprintActive())return false;
   const res=sprintResults(),today=sprintToday();
-  return sprintWeeks().some(w=>w.end<=today&&!((res[w.end]||{}).reading&&(res[w.end]||{}).zone));
+  return sprintWeeks().some(w=>['reading','zone'].some(g=>sprintNeeds((res[w.end]||{})[g],w,today)));
 }
 function sprintRange(w){
   const a=parseKey(w.start),b=parseKey(w.end),mo=d=>d.toLocaleDateString('en-GB',{month:'short'});
@@ -2829,26 +2844,33 @@ function renderSprint(el){
   const total=rows.length,totalDays=sprintDiff(SPRINT.start,SPRINT.end)+1;
   const pct=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0;
   const f=n=>Math.round(n).toLocaleString('en-GB'),n1=v=>String(Math.round(v*10)/10);
-  const rLog=rows.filter(r=>r.reading),rAvg=rLog.length?rLog.reduce((a,r)=>a+r.reading.v,0)/rLog.length:null,rHit=rLog.filter(r=>r.reading.ok).length;
-  const zLog=rows.filter(r=>r.zone),zDone=zLog.reduce((a,r)=>a+r.zone.v,0);
-  const zSoFar=rows.filter(r=>r.due||r.zone).reduce((a,r)=>a+r.zoneTarget,0),zAll=rows.reduce((a,r)=>a+r.zoneTarget,0);
+  const cur=sprintCurrentWeek(rows,today);
+  // Reading: the average counts weeks that are done (target hit, or the week has ended); a week still running gets its own bar.
+  const rDone=rows.filter(r=>r.reading&&sprintState(r.reading,r,today)!=='prog'),rAvg=rDone.length?rDone.reduce((a,r)=>a+r.reading.v,0)/rDone.length:null,rHit=rows.filter(r=>r.reading&&r.reading.ok).length;
+  const zDone=rows.reduce((a,r)=>a+(r.zone?r.zone.v:0),0),zAll=rows.reduce((a,r)=>a+r.zoneTarget,0);
+  // "Target so far" builds up day by day (320 ÷ 7 a day), so part-way through a week you can see if you're ahead or behind.
+  const zPace=rows.reduce((a,r)=>a+r.zoneTarget*Math.max(0,Math.min(r.days,sprintDiff(r.start,today)+1))/r.days,0);
+  const paceTxt=Math.abs(zDone-zPace)<0.5?'on target':zDone>zPace?`${Math.round(zDone-zPace).toLocaleString('en-GB')} ahead`:`${Math.round(zPace-zDone).toLocaleString('en-GB')} behind`;
   const earned=rows.reduce((a,r)=>a+(r.reading&&r.reading.star?SPRINT.stars:0)+(r.zone&&r.zone.star?SPRINT.stars:0),0);
   const dayN=sprintDiff(SPRINT.start,today)+1,left=sprintDiff(today,SPRINT.end);
   const dayLine=today<SPRINT.start?`Starts Monday ${parseKey(SPRINT.start).toLocaleDateString('en-GB',{day:'numeric',month:'long'})}`:today>SPRINT.end?'The sprint has finished.':`Day ${dayN} of ${totalDays} · ${left===0?'Christmas Day':left+(left===1?' day':' days')+' to Christmas'}`;
-  const chip=(r,g)=>{const x=r[g];return `<div class="sp-chip ${x?(x.ok?'ok':'miss'):''}${r.now?' now':''}">W${r.n}<b>${x?(x.ok?'✓':'✗'):(r.due?'·':'–')}</b></div>`;};
-  const pill=(x,label,txt)=>x?`<span class="sp-pill ${x.ok?'ok':'miss'}">${label} ${x.ok?'✓':'✗'} ${txt}</span>`:`<span class="sp-pill">${label} –</span>`;
+  const mark={ok:'✓',miss:'✗',prog:'…'};
+  const chip=(r,g)=>{const st=sprintState(r[g],r,today);return `<div class="sp-chip ${st||''}${r.now?' now':''}">W${r.n}<b>${st?mark[st]:(r.due?'·':'–')}</b></div>`;};
+  const pill=(r,g,label,txt)=>{const st=sprintState(r[g],r,today);return st?`<span class="sp-pill ${st}">${label} ${st==='prog'?txt+' so far':mark[st]+' '+txt}</span>`:`<span class="sp-pill">${label} –</span>`;};
   const list=rows.map(r=>{
-    const needs=r.due&&!(r.reading&&r.zone);
-    return `<div class="sp-row" onclick="sprintOpen('${r.end}')"><div><div class="sp-wk">Week ${r.n}${needs?'<span class="sp-due">Log now</span>':''}</div><div class="sp-when">${sprintRange(r)} · check-in ${sprintCheckIn(r)}${r.days<7?` · ${r.days} days, target ${f(r.zoneTarget)} min`:''}</div></div><div class="sp-res">${pill(r.reading,'Reading',r.reading?n1(r.reading.v)+'%':'')}${pill(r.zone,'Zone',r.zone?f(r.zone.v):'')}</div></div>`;
+    const needs=['reading','zone'].some(g=>sprintNeeds(r[g],r,today));
+    return `<div class="sp-row" onclick="sprintOpen('${r.end}')"><div><div class="sp-wk">Week ${r.n}${needs?'<span class="sp-due">Log now</span>':(r.now?'<span class="sp-now">This week</span>':'')}</div><div class="sp-when">${sprintRange(r)} · final check-in ${sprintCheckIn(r)}${r.days<7?` · ${r.days} days, target ${f(r.zoneTarget)} min`:''}</div></div><div class="sp-res">${pill(r,'reading','Reading',r.reading?n1(r.reading.v)+'%':'')}${pill(r,'zone','Zone',r.zone?f(r.zone.v):'')}</div></div>`;
   }).join('');
   el.innerHTML=`<div class="section-rule"><div><div class="section-title">Christmas sprint</div><div class="section-sub">${totalDays} days · ${parseKey(SPRINT.start).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} to ${parseKey(SPRINT.end).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div></div>
   <div class="sp-day">${dayLine}</div>
+  <button class="btn primary" style="width:100%;justify-content:center" onclick="sprintOpen('${cur.end}')">${cur.now?`Log this week (week ${cur.n})`:`Log week ${cur.n}`}</button>
+  <div class="sp-note" style="margin:8px 2px 18px">Log any day: enter what you have so far, then update it as the week goes on. A ✓ appears as soon as you reach the target; a ✗ only once the week has ended.</div>
   <div class="graph-card">
     <div class="graph-title">Reading</div>
     <div class="graph-sub">Hit ${SPRINT.readingMin}–100% of your reading goal each week.</div>
-    <div class="sp-big">${rAvg==null?'—':Math.round(rAvg)+'%'}<small>${rLog.length?`average over ${rLog.length} ${rLog.length===1?'week':'weeks'}`:'nothing logged yet'}</small></div>
-    <div class="sp-bl"><span>Average so far</span><span><b>${rAvg==null?'—':n1(rAvg)+'%'}</b> · target ${SPRINT.readingMin}–100%</span></div>
-    <div class="sp-bar"><div class="sp-fill ${rAvg!=null&&rAvg>=SPRINT.readingMin?'ok':''}" style="width:${pct(rAvg||0,100)}%"></div><div class="sp-band" style="left:${SPRINT.readingMin}%;width:${100-SPRINT.readingMin}%"></div></div>
+    <div class="sp-big">${rAvg==null?'—':Math.round(rAvg)+'%'}<small>${rDone.length?`average of ${rDone.length} ${rDone.length===1?'week':'weeks'} done`:'no weeks done yet'}</small></div>
+    <div class="sp-bl"><span>${cur.now?'This week so far':`Week ${cur.n}`}</span><span>${cur.reading?`<b>${n1(cur.reading.v)}%</b> · target ${SPRINT.readingMin}–100%`:'not logged yet'}</span></div>
+    <div class="sp-bar"><div class="sp-fill ${cur.reading&&cur.reading.v>=SPRINT.readingMin?'ok':''}" style="width:${pct(cur.reading?cur.reading.v:0,100)}%"></div><div class="sp-band" style="left:${SPRINT.readingMin}%;width:${100-SPRINT.readingMin}%"></div></div>
     <div class="sp-bl"><span>Weeks hit</span><span><b>${rHit}</b> of ${total} weeks</span></div>
     <div class="sp-bar"><div class="sp-fill ${rHit===total?'ok':''}" style="width:${pct(rHit,total)}%"></div></div>
     <div class="sp-chips">${rows.map(r=>chip(r,'reading')).join('')}</div>
@@ -2857,18 +2879,18 @@ function renderSprint(el){
     <div class="graph-title">Zone minutes</div>
     <div class="graph-sub">Hit ${SPRINT.zone} zone minutes a week until Christmas.</div>
     <div class="sp-big">${f(zDone)}<small>min logged</small></div>
-    <div class="sp-bl"><span>Against target so far</span><span>${zSoFar?`<b>${f(zDone)}</b> of ${f(zSoFar)} min`:`first check-in ${sprintCheckIn(rows[0])}`}</span></div>
-    <div class="sp-bar"><div class="sp-fill ${zSoFar>0&&zDone>=zSoFar?'ok':''}" style="width:${pct(zDone,zSoFar)}%"></div></div>
+    <div class="sp-bl"><span>Against target so far</span><span>${today<SPRINT.start?`builds up from ${parseKey(SPRINT.start).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`:`<b>${f(zDone)}</b> of ${f(zPace)} min · ${paceTxt}`}</span></div>
+    <div class="sp-bar"><div class="sp-fill ${zPace>0&&zDone>=zPace?'ok':''}" style="width:${pct(zDone,zPace)}%"></div></div>
     <div class="sp-bl"><span>Whole sprint</span><span><b>${f(zDone)}</b> of ${f(zAll)} min</span></div>
     <div class="sp-bar"><div class="sp-fill ${zDone>=zAll?'ok':''}" style="width:${pct(zDone,zAll)}%"></div></div>
     <div class="sp-chips">${rows.map(r=>chip(r,'zone')).join('')}</div>
   </div>
   <div class="graph-card">
     <div class="graph-title">Weekly check-in</div>
-    <div class="graph-sub">Log it each Sunday evening. Tap a week to add or change it.</div>
+    <div class="graph-sub">Tap any week to log or update it. Do the final update on the Sunday evening.</div>
     ${list}
   </div>
-  <div class="sp-note">Each goal you tick earns <b>${SPRINT.stars} ★</b>, added to your balance automatically. Sprint stars so far: <b>${earned} ★</b>. Changing a week back to a cross takes its stars off again.</div>`;
+  <div class="sp-note">Each goal you tick earns <b>${SPRINT.stars} ★</b>, added to your balance as soon as you reach the target. Sprint stars so far: <b>${earned} ★</b>. If a figure is later corrected below its target, those stars come off again.</div>`;
 }
 let spEdit=null;
 function sprintOpen(end){
@@ -2876,10 +2898,12 @@ function sprintOpen(end){
   spEdit=end;
   const r=sprintResults()[end]||{};
   const enter=`onkeydown="if(event.key==='Enter'){event.preventDefault();sprintSave();}"`;
-  openModal(`<div class="field-label">Reading goal reached</div>
+  const over=sprintToday()>=w.end;
+  openModal(`<div class="ie-hint" style="margin:-6px 0 14px">${over?'This week has reached its last day — enter your final numbers.':'This week is still running. Save what you have so far and update it any day — a ✓ appears as soon as you reach the target, a ✗ only once the week ends.'}</div>
+    <div class="field-label">Reading goal reached${over?'':' so far'}</div>
     <div class="vfield"><input id="sp-read" inputmode="decimal" autocomplete="off" placeholder="e.g. 94" value="${r.reading?r.reading.v:''}" oninput="sprintPreview()" ${enter}/><span class="ie-unit">%</span></div>
     <div class="ie-hint" id="sp-read-hint"></div>
-    <div class="field-label" style="margin-top:14px">Zone minutes this week</div>
+    <div class="field-label" style="margin-top:14px">Zone minutes${over?' this week':' so far this week'}</div>
     <div class="vfield"><input id="sp-zone" inputmode="numeric" autocomplete="off" placeholder="e.g. 340" value="${r.zone?r.zone.v:''}" oninput="sprintPreview()" ${enter}/><span class="ie-unit">min</span></div>
     <div class="ie-hint" id="sp-zone-hint"></div>
     <div class="tb-actions"><button class="btn primary" onclick="sprintSave()">Save week</button><button class="btn" onclick="sprintClear()">Clear</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancel</button></div>`,`Week ${w.n} · ${sprintRange(w)}`);
@@ -2888,8 +2912,9 @@ function sprintOpen(end){
 function sprintParse(id){const el=document.getElementById(id);if(!el)return null;const t=el.value.replace(/[^0-9.]/g,'');return t===''||isNaN(+t)?null:Math.round(+t*10)/10;}
 function sprintPreview(){
   const w=sprintWeeks().find(x=>x.end===spEdit);if(!w)return;
-  const r=sprintResults()[spEdit]||{},rv=sprintParse('sp-read'),zv=sprintParse('sp-zone');
-  const line=(v,need,unit,prev)=>v==null?`Leave blank if you haven't got it yet. ${need}${unit} or more is a tick (+${SPRINT.stars} ★).`:(v>=need?`✓ Tick — ${prev&&prev.star?`${SPRINT.stars} ★ already added`:`+${SPRINT.stars} ★`}`:`✗ Cross — ${need}${unit} is needed for a tick. Enter 0 if you missed it.`);
+  const r=sprintResults()[spEdit]||{},rv=sprintParse('sp-read'),zv=sprintParse('sp-zone'),over=sprintToday()>=w.end;
+  const left=(need,v)=>Math.round((need-v)*10)/10;
+  const line=(v,need,unit,prev)=>v==null?`Leave blank if you haven't got it yet. ${need}${unit} or more is a tick (+${SPRINT.stars} ★).`:(v>=need?`✓ Tick — ${prev&&prev.star?`${SPRINT.stars} ★ already added`:`+${SPRINT.stars} ★`}`:(over?`✗ Cross — ${need}${unit} is needed for a tick. Enter 0 if you missed it.`:`${left(need,v)}${unit} to go to reach ${need}${unit} · saved as "so far"`));
   document.getElementById('sp-read-hint').textContent=line(rv,SPRINT.readingMin,'%',r.reading);
   document.getElementById('sp-zone-hint').textContent=line(zv,w.zoneTarget,' min',r.zone);
 }
@@ -2909,7 +2934,7 @@ function sprintApply(s,w,rec,key,val,ok,label){
     s.log=(s.log||[]).concat([{id:star,type:'earn',label:`Sprint · ${label} · week ${w.n}`,stars:SPRINT.stars,at:Date.now(),src:'sprint'}]);
     gained=SPRINT.stars;
   }else if(!ok&&star){gained=-sprintRevoke(s,star);star=null;}
-  rec[key]={v:val,ok,star};
+  rec[key]={v:val,ok,star,at:Date.now()};
   return gained;
 }
 function sprintSave(){
