@@ -429,6 +429,33 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .wk-rest-next{font-size:1rem;color:var(--muted);margin-top:18px}
 .wk-rest-next b{color:var(--ink)}
 .wk-mute{background:none;border:none;font-size:1.25rem;line-height:1;padding:2px;cursor:pointer}
+/* ===== CHRISTMAS SPRINT (temporary tab) ===== */
+.sp-day{font-size:.86rem;color:var(--muted);margin:-8px 0 18px}
+.sp-big{font-family:var(--serif);font-size:2.4rem;font-weight:700;line-height:1;font-variant-numeric:lining-nums;margin:4px 0 6px}
+.sp-big small{font-family:var(--sans);font-size:.8rem;font-weight:500;color:var(--muted);margin-left:8px}
+.sp-bl{display:flex;justify-content:space-between;gap:10px;font-size:.78rem;color:var(--muted);margin:12px 0 6px}
+.sp-bl b{color:var(--ink);font-variant-numeric:lining-nums}
+.sp-bar{position:relative;height:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.sp-fill{position:absolute;left:0;top:0;bottom:0;background:#c99a2e;border-radius:6px;transition:width .5s}
+.sp-fill.ok{background:#2a7a4a}
+.sp-band{position:absolute;top:0;bottom:0;background:rgba(42,122,74,.2);border-left:1px dashed #2a7a4a}
+.sp-chips{display:flex;gap:6px;margin:16px 0 6px}
+.sp-chip{flex:1;text-align:center;border:1px solid var(--line);border-radius:10px;padding:6px 0 5px;background:var(--bg);font-size:.68rem;color:var(--muted)}
+.sp-chip b{display:block;font-size:1.05rem;line-height:1.25;font-weight:700}
+.sp-chip.ok{border-color:#2a7a4a;color:#2a7a4a;background:rgba(42,122,74,.08)}
+.sp-chip.miss{border-color:#a82020;color:#a82020;background:rgba(168,32,32,.07)}
+.sp-chip.now{box-shadow:0 0 0 2px var(--accent-soft);border-color:var(--accent)}
+.sp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.sp-row:last-child{border-bottom:none}
+.sp-wk{font-weight:600;font-size:.94rem}
+.sp-wk .sp-due{margin-left:8px;font-size:.66rem;font-weight:700;color:var(--bg);background:var(--accent);border-radius:999px;padding:2px 8px;vertical-align:1px}
+.sp-when{font-size:.76rem;color:var(--muted);margin-top:2px}
+.sp-res{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.sp-pill{font-size:.74rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap;font-variant-numeric:lining-nums}
+.sp-pill.ok{color:#2a7a4a;border-color:#2a7a4a;background:rgba(42,122,74,.08)}
+.sp-pill.miss{color:#a82020;border-color:#a82020;background:rgba(168,32,32,.07)}
+.sp-note{font-size:.8rem;color:var(--muted);line-height:1.5;margin:4px 2px 0}
+.sp-note b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -594,7 +621,7 @@ function localSignIn(){
 }
 // A silent Google reconnect reloads the page. Before it does, rememberView() notes which tab you were on so
 // the app reopens there (it used to always reopen on Today, which looked like being thrown back to the home page).
-const RETURN_VIEWS=['today','entries','settings','scorecard','graphs','health','workouts','rewards'];
+const RETURN_VIEWS=['today','entries','settings','scorecard','graphs','health','workouts','rewards','sprint'];
 function rememberView(){try{sessionStorage.setItem('journal_return_view',JSON.stringify({v:currentView,t:Date.now()}));}catch(e){}}
 function startView(){
   let rv=null;
@@ -1075,14 +1102,15 @@ function deleteReminder(id){
 // Two-section nav: the journal section (Journal/Entries/Style) and the star/tracking
 // section (Scorecard/Graphs/Workouts). Which section shows is derived from the view —
 // the ★ opens the star section, and the DAYBOOK brand goes to Journal (the journal section).
-const STAR_VIEWS=['scorecard','graphs','health','workouts','rewards'];
+const STAR_VIEWS=['scorecard','graphs','health','workouts','rewards','sprint'];
 const ICO_GEAR='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>';
 const NAV_JOURNAL=[['today','Journal','<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'],['entries','Entries','<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22H20v-2.5"/></svg>'],['settings','Style',ICO_GEAR]];
-const NAV_STAR=[['scorecard','Scorecard','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>'],['graphs','Graphs','<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>'],['health','Health','<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h4l2-3 3 6 2-3h6"/></svg>'],['workouts','Workouts','<svg viewBox="0 0 24 24"><path d="M6.5 7v10M4 9.5v5M17.5 7v10M20 9.5v5M6.5 12h11"/></svg>']];
+const NAV_STAR=[['scorecard','Scorecard','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M9 5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1H9Z"/><path d="m8.5 13 2 2 4-4.5"/></svg>'],['graphs','Graphs','<svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>'],['health','Health','<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h4l2-3 3 6 2-3h6"/></svg>'],['workouts','Workouts','<svg viewBox="0 0 24 24"><path d="M6.5 7v10M4 9.5v5M17.5 7v10M20 9.5v5M6.5 12h11"/></svg>'],['sprint','Sprint','<svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h12l-2.5 4L17 12H5"/></svg>']];
 function renderBottomNav(){
-  const set=STAR_VIEWS.includes(currentView)?NAV_STAR:NAV_JOURNAL;
+  // The Sprint tab is temporary: it only shows from the sprint through a week after Christmas.
+  const set=STAR_VIEWS.includes(currentView)?NAV_STAR.filter(([v])=>v!=='sprint'||sprintActive()):NAV_JOURNAL;
   const nav=document.getElementById('bottom-nav');if(!nav)return;
-  nav.innerHTML=set.map(([v,label,icon])=>`<button class="nav-btn ${v===currentView?'active':''}" data-v="${v}" onclick="showView('${v}')">${v==='scorecard'?'<span class="nav-due" id="habits-due" style="display:none"></span>':''}${v==='health'?`<span class="nav-due" style="display:${foodDue()?'block':'none'}"></span>`:''}${icon}${label}</button>`).join('');
+  nav.innerHTML=set.map(([v,label,icon])=>`<button class="nav-btn ${v===currentView?'active':''}" data-v="${v}" onclick="showView('${v}')">${v==='scorecard'?'<span class="nav-due" id="habits-due" style="display:none"></span>':''}${v==='health'?`<span class="nav-due" style="display:${foodDue()?'block':'none'}"></span>`:''}${v==='sprint'?`<span class="nav-due" id="sprint-due" style="display:${sprintDue()?'block':'none'}"></span>`:''}${icon}${label}</button>`).join('');
 }
 function updateHeader(){
   const sub=document.getElementById('header-date');if(!sub)return;
@@ -1105,6 +1133,7 @@ function showView(v){
   else if(v==='scorecard')renderScorecard(el);
   else if(v==='workouts')renderWorkouts(el);
   else if(v==='health')renderHealth(el);
+  else if(v==='sprint')renderSprint(el);
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
   renderBottomNav();updateStarsFab();updateScorecardDue();updateHeader();
@@ -1589,7 +1618,7 @@ function scoreCard(card){let g=0,n=0,b=0;const r=(card&&card.ratings)||{};Object
 function scCardsSorted(){return (scorecardData().cards||[]).slice().sort((a,b)=>(a.date<b.date?1:a.date>b.date?-1:(b.at||0)-(a.at||0)));}
 function scCurrentPeriodCard(){const d=scorecardData();if(d.cadence==='none')return null;const pk=scPeriodKey(dkey(new Date()),d.cadence);return (d.cards||[]).find(c=>scPeriodKey(c.date,d.cadence)===pk)||null;}
 function scorecardDue(){const d=scorecardData();if(!d.cadence||d.cadence==='none'||!(d.habits||[]).length)return false;return !scCurrentPeriodCard();}
-function updateScorecardDue(){const due=scorecardDue();const t=document.getElementById('habits-due');if(t)t.style.display=due?'block':'none';const f=document.getElementById('fab-due');if(f)f.style.display=due||foodDue()?'block':'none';}
+function updateScorecardDue(){const due=scorecardDue();const t=document.getElementById('habits-due');if(t)t.style.display=due?'block':'none';const f=document.getElementById('fab-due');if(f)f.style.display=due||foodDue()||sprintDue()?'block':'none';const sd=document.getElementById('sprint-due');if(sd)sd.style.display=sprintDue()?'block':'none';}
 function scNetHtml(net){const sign=net>0?'+':'';const cls=net>0?'pos':net<0?'neg':'zero';return {sign,cls};}
 function renderScorecard(el){
   ensureScorecardSeeded();
@@ -2739,6 +2768,147 @@ function wkDone(){
   wkStopAll();
   const el=document.getElementById('view');
   el.innerHTML=`<div class="wk-done"><div class="wk-done-mark">✓</div><div class="section-title" style="font-family:'Cormorant Garamond',serif;text-align:center">Workout complete</div><div class="section-sub" style="text-align:center">Nice work.</div><div class="entry-actions" style="justify-content:center;margin-top:20px"><button class="btn primary" onclick="wkBackToList()">Done</button></div></div>`;
+}
+
+// ── CHRISTMAS SPRINT (temporary tab in the star section) ──
+// 40 days (Mon 16 Nov to Christmas Day), checked in each Sunday evening: a tick or cross per goal per week, with the
+// number behind it (reading % / zone minutes). Each ticked goal earns 25 ★ in the normal stars log; turning a tick
+// back into a cross takes it off again. Results live inside the synced `stars` object (stars.sprint), so the balance,
+// the log and the sprint always change together. The tab hides itself a week after Christmas.
+const SPRINT={start:'2026-11-16',end:'2026-12-25',zone:320,readingMin:90,stars:25,hideAfterDays:7};
+function sprintToday(){return dkey(new Date());}
+function sprintAdd(k,n){return dkey(addDays(parseKey(k),n));}
+function sprintDiff(a,b){return Math.round((parseKey(b)-parseKey(a))/86400000);}
+function sprintActive(){return sprintToday()<=sprintAdd(SPRINT.end,SPRINT.hideAfterDays);}
+// Weeks run Monday to Sunday; the last one is the short stretch up to Christmas Day, with a pro-rated zone target.
+function sprintWeeks(){
+  const out=[];let s=SPRINT.start;
+  while(s<=SPRINT.end){
+    const e6=sprintAdd(s,6),e=e6<SPRINT.end?e6:SPRINT.end,days=sprintDiff(s,e)+1;
+    out.push({n:out.length+1,start:s,end:e,days,zoneTarget:Math.round(SPRINT.zone*days/7)});
+    s=sprintAdd(e,1);
+  }
+  return out;
+}
+function sprintResults(){const sp=starsData().sprint;return (sp&&sp.weeks)||{};}
+function sprintDue(){
+  if(!starsAllowed()||!sprintActive())return false;
+  const res=sprintResults(),today=sprintToday();
+  return sprintWeeks().some(w=>w.end<=today&&!((res[w.end]||{}).reading&&(res[w.end]||{}).zone));
+}
+function sprintRange(w){
+  const a=parseKey(w.start),b=parseKey(w.end),mo=d=>d.toLocaleDateString('en-GB',{month:'short'});
+  return a.getMonth()===b.getMonth()?`${a.getDate()}–${b.getDate()} ${mo(b)}`:`${a.getDate()} ${mo(a)} – ${b.getDate()} ${mo(b)}`;
+}
+function sprintCheckIn(w){return parseKey(w.end).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}
+function refreshSprint(){renderSprint(document.getElementById('view'));}
+function renderSprint(el){
+  if(!starsAllowed()){showView('today');return;}
+  ensureStarsSeeded();
+  const today=sprintToday(),res=sprintResults();
+  const rows=sprintWeeks().map(w=>{const r=res[w.end]||{};return Object.assign({},w,{reading:r.reading||null,zone:r.zone||null,due:w.end<=today,now:today>=w.start&&today<=w.end});});
+  const total=rows.length,totalDays=sprintDiff(SPRINT.start,SPRINT.end)+1;
+  const pct=(a,b)=>b>0?Math.max(0,Math.min(100,a/b*100)):0;
+  const f=n=>Math.round(n).toLocaleString('en-GB'),n1=v=>String(Math.round(v*10)/10);
+  const rLog=rows.filter(r=>r.reading),rAvg=rLog.length?rLog.reduce((a,r)=>a+r.reading.v,0)/rLog.length:null,rHit=rLog.filter(r=>r.reading.ok).length;
+  const zLog=rows.filter(r=>r.zone),zDone=zLog.reduce((a,r)=>a+r.zone.v,0);
+  const zSoFar=rows.filter(r=>r.due||r.zone).reduce((a,r)=>a+r.zoneTarget,0),zAll=rows.reduce((a,r)=>a+r.zoneTarget,0);
+  const earned=rows.reduce((a,r)=>a+(r.reading&&r.reading.star?SPRINT.stars:0)+(r.zone&&r.zone.star?SPRINT.stars:0),0);
+  const dayN=sprintDiff(SPRINT.start,today)+1,left=sprintDiff(today,SPRINT.end);
+  const dayLine=today<SPRINT.start?`Starts Monday ${parseKey(SPRINT.start).toLocaleDateString('en-GB',{day:'numeric',month:'long'})}`:today>SPRINT.end?'The sprint has finished.':`Day ${dayN} of ${totalDays} · ${left===0?'Christmas Day':left+(left===1?' day':' days')+' to Christmas'}`;
+  const chip=(r,g)=>{const x=r[g];return `<div class="sp-chip ${x?(x.ok?'ok':'miss'):''}${r.now?' now':''}">W${r.n}<b>${x?(x.ok?'✓':'✗'):(r.due?'·':'–')}</b></div>`;};
+  const pill=(x,label,txt)=>x?`<span class="sp-pill ${x.ok?'ok':'miss'}">${label} ${x.ok?'✓':'✗'} ${txt}</span>`:`<span class="sp-pill">${label} –</span>`;
+  const list=rows.map(r=>{
+    const needs=r.due&&!(r.reading&&r.zone);
+    return `<div class="sp-row" onclick="sprintOpen('${r.end}')"><div><div class="sp-wk">Week ${r.n}${needs?'<span class="sp-due">Log now</span>':''}</div><div class="sp-when">${sprintRange(r)} · check-in ${sprintCheckIn(r)}${r.days<7?` · ${r.days} days, target ${f(r.zoneTarget)} min`:''}</div></div><div class="sp-res">${pill(r.reading,'Reading',r.reading?n1(r.reading.v)+'%':'')}${pill(r.zone,'Zone',r.zone?f(r.zone.v):'')}</div></div>`;
+  }).join('');
+  el.innerHTML=`<div class="section-rule"><div><div class="section-title">Christmas sprint</div><div class="section-sub">${totalDays} days · ${parseKey(SPRINT.start).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} to ${parseKey(SPRINT.end).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></div></div>
+  <div class="sp-day">${dayLine}</div>
+  <div class="graph-card">
+    <div class="graph-title">Reading</div>
+    <div class="graph-sub">Hit ${SPRINT.readingMin}–100% of your reading goal each week.</div>
+    <div class="sp-big">${rAvg==null?'—':Math.round(rAvg)+'%'}<small>${rLog.length?`average over ${rLog.length} ${rLog.length===1?'week':'weeks'}`:'nothing logged yet'}</small></div>
+    <div class="sp-bl"><span>Average so far</span><span><b>${rAvg==null?'—':n1(rAvg)+'%'}</b> · target ${SPRINT.readingMin}–100%</span></div>
+    <div class="sp-bar"><div class="sp-fill ${rAvg!=null&&rAvg>=SPRINT.readingMin?'ok':''}" style="width:${pct(rAvg||0,100)}%"></div><div class="sp-band" style="left:${SPRINT.readingMin}%;width:${100-SPRINT.readingMin}%"></div></div>
+    <div class="sp-bl"><span>Weeks hit</span><span><b>${rHit}</b> of ${total} weeks</span></div>
+    <div class="sp-bar"><div class="sp-fill ${rHit===total?'ok':''}" style="width:${pct(rHit,total)}%"></div></div>
+    <div class="sp-chips">${rows.map(r=>chip(r,'reading')).join('')}</div>
+  </div>
+  <div class="graph-card">
+    <div class="graph-title">Zone minutes</div>
+    <div class="graph-sub">Hit ${SPRINT.zone} zone minutes a week until Christmas.</div>
+    <div class="sp-big">${f(zDone)}<small>min logged</small></div>
+    <div class="sp-bl"><span>Against target so far</span><span>${zSoFar?`<b>${f(zDone)}</b> of ${f(zSoFar)} min`:`first check-in ${sprintCheckIn(rows[0])}`}</span></div>
+    <div class="sp-bar"><div class="sp-fill ${zSoFar>0&&zDone>=zSoFar?'ok':''}" style="width:${pct(zDone,zSoFar)}%"></div></div>
+    <div class="sp-bl"><span>Whole sprint</span><span><b>${f(zDone)}</b> of ${f(zAll)} min</span></div>
+    <div class="sp-bar"><div class="sp-fill ${zDone>=zAll?'ok':''}" style="width:${pct(zDone,zAll)}%"></div></div>
+    <div class="sp-chips">${rows.map(r=>chip(r,'zone')).join('')}</div>
+  </div>
+  <div class="graph-card">
+    <div class="graph-title">Weekly check-in</div>
+    <div class="graph-sub">Log it each Sunday evening. Tap a week to add or change it.</div>
+    ${list}
+  </div>
+  <div class="sp-note">Each goal you tick earns <b>${SPRINT.stars} ★</b>, added to your balance automatically. Sprint stars so far: <b>${earned} ★</b>. Changing a week back to a cross takes its stars off again.</div>`;
+}
+let spEdit=null;
+function sprintOpen(end){
+  const w=sprintWeeks().find(x=>x.end===end);if(!w)return;
+  spEdit=end;
+  const r=sprintResults()[end]||{};
+  const enter=`onkeydown="if(event.key==='Enter'){event.preventDefault();sprintSave();}"`;
+  openModal(`<div class="field-label">Reading goal reached</div>
+    <div class="vfield"><input id="sp-read" inputmode="decimal" autocomplete="off" placeholder="e.g. 94" value="${r.reading?r.reading.v:''}" oninput="sprintPreview()" ${enter}/><span class="ie-unit">%</span></div>
+    <div class="ie-hint" id="sp-read-hint"></div>
+    <div class="field-label" style="margin-top:14px">Zone minutes this week</div>
+    <div class="vfield"><input id="sp-zone" inputmode="numeric" autocomplete="off" placeholder="e.g. 340" value="${r.zone?r.zone.v:''}" oninput="sprintPreview()" ${enter}/><span class="ie-unit">min</span></div>
+    <div class="ie-hint" id="sp-zone-hint"></div>
+    <div class="tb-actions"><button class="btn primary" onclick="sprintSave()">Save week</button><button class="btn" onclick="sprintClear()">Clear</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancel</button></div>`,`Week ${w.n} · ${sprintRange(w)}`);
+  sprintPreview();
+}
+function sprintParse(id){const el=document.getElementById(id);if(!el)return null;const t=el.value.replace(/[^0-9.]/g,'');return t===''||isNaN(+t)?null:Math.round(+t*10)/10;}
+function sprintPreview(){
+  const w=sprintWeeks().find(x=>x.end===spEdit);if(!w)return;
+  const r=sprintResults()[spEdit]||{},rv=sprintParse('sp-read'),zv=sprintParse('sp-zone');
+  const line=(v,need,unit,prev)=>v==null?`Leave blank if you haven't got it yet. ${need}${unit} or more is a tick (+${SPRINT.stars} ★).`:(v>=need?`✓ Tick — ${prev&&prev.star?`${SPRINT.stars} ★ already added`:`+${SPRINT.stars} ★`}`:`✗ Cross — ${need}${unit} is needed for a tick. Enter 0 if you missed it.`);
+  document.getElementById('sp-read-hint').textContent=line(rv,SPRINT.readingMin,'%',r.reading);
+  document.getElementById('sp-zone-hint').textContent=line(zv,w.zoneTarget,' min',r.zone);
+}
+// Takes a sprint award back out of the log and balance; returns how many stars came off.
+function sprintRevoke(s,id){
+  const i=(s.log||[]).findIndex(l=>l.id===id);if(i<0)return 0;
+  const n=s.log[i].stars||0;s.balance=(s.balance||0)-n;s.log.splice(i,1);return n;
+}
+// Records one goal for a week and settles its stars: award on a new tick, take back if a tick became a cross.
+// Returns the net star change.
+function sprintApply(s,w,rec,key,val,ok,label){
+  const prev=rec[key];
+  if(val==null){const back=prev&&prev.star?sprintRevoke(s,prev.star):0;delete rec[key];return -back;}
+  let star=prev&&prev.star?prev.star:null,gained=0;
+  if(ok&&!star){
+    star=uid();s.balance=(s.balance||0)+SPRINT.stars;
+    s.log=(s.log||[]).concat([{id:star,type:'earn',label:`Sprint · ${label} · week ${w.n}`,stars:SPRINT.stars,at:Date.now(),src:'sprint'}]);
+    gained=SPRINT.stars;
+  }else if(!ok&&star){gained=-sprintRevoke(s,star);star=null;}
+  rec[key]={v:val,ok,star};
+  return gained;
+}
+function sprintSave(){
+  const w=sprintWeeks().find(x=>x.end===spEdit);if(!w)return;
+  const rv=sprintParse('sp-read'),zv=sprintParse('sp-zone');
+  const s=starsData();if(!s.sprint||!s.sprint.weeks)s.sprint={weeks:{}};
+  const rec=s.sprint.weeks[w.end]||{};
+  const gained=sprintApply(s,w,rec,'reading',rv,rv!=null&&rv>=SPRINT.readingMin,'Reading goal')+sprintApply(s,w,rec,'zone',zv,zv!=null&&zv>=w.zoneTarget,'Zone minutes');
+  if(rec.reading||rec.zone){rec.updated=Date.now();s.sprint.weeks[w.end]=rec;}else delete s.sprint.weeks[w.end];
+  saveStars(s);closeModal();
+  refreshSprint();updateHeader();updateScorecardDue();
+  if(gained>0)showToast(`+${gained} ★ added`,true);else if(gained<0)showToast(`${gained} ★ taken off`);
+}
+function sprintClear(){
+  if(!confirm("Clear this week's results? Any sprint stars it earned come off your balance."))return;
+  const s=starsData(),wk=s.sprint&&s.sprint.weeks&&s.sprint.weeks[spEdit];
+  if(wk){['reading','zone'].forEach(k=>{if(wk[k]&&wk[k].star)sprintRevoke(s,wk[k].star);});delete s.sprint.weeks[spEdit];}
+  saveStars(s);closeModal();refreshSprint();updateHeader();updateScorecardDue();
 }
 
 // ── STARS / REWARDS (beta — visible only to emails in STARS_BETA_EMAILS above) ──
