@@ -194,6 +194,9 @@ main{max-width:720px;margin:0 auto;width:100%;flex:1;padding:22px 18px calc(96px
 /* STARS / REWARDS */
 .stars-fab{position:fixed;right:18px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:260;width:54px;height:54px;border-radius:50%;background:var(--ink);border:none;color:#d9a848;font-size:1.5rem;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.22);transition:transform .2s}
 .stars-fab:active{transform:scale(.94)}
+#stars-fab-btn{bottom:calc(168px + env(safe-area-inset-bottom))} /* sits above the Health button, which takes the original spot */
+.health-fab{color:#e8837c}
+.health-fab svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .stars-balance-card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:20px 20px 22px;margin-bottom:22px}
 .stars-balance-head{display:flex;align-items:center;gap:7px;font-size:.66rem;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
 .stars-info-btn{background:none;color:var(--muted);width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--muted);border-radius:50%;font-size:.6rem;font-style:italic;line-height:1}
@@ -460,6 +463,7 @@ input::placeholder,textarea::placeholder{font-style:normal}
   <input type="file" id="wk-video" accept="video/*"/>
   <input type="file" id="import-file" accept="application/json"/>
   <button class="stars-fab" id="stars-fab-btn" style="display:none" onclick="showView('rewards')" title="Rewards"><span class="nav-due" id="fab-due" style="display:none"></span>★</button>
+  <button class="stars-fab health-fab" id="health-fab-btn" style="display:none" onclick="showView('health')" title="Health"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h4l2-3 3 6 2-3h6"/></svg></button>
 </div>
 
 <div id="modal-root"></div>
@@ -537,7 +541,7 @@ function monthName(y,m){return new Date(y,m,1).toLocaleDateString('en-GB',{month
 function getEntriesRaw(){return userData('entries',{});}
 function getEntry(k){const e=getEntriesRaw()[k];return (e&&!e.deleted)?e:null;}
 function putEntry(k,e){const all=getEntriesRaw();e.updated=Date.now();all[k]=e;saveData('entries',all);}
-function liveEntryKeys(){const all=getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
+function liveEntryKeys(all){all=all||getEntriesRaw();return Object.keys(all).filter(k=>!all[k].deleted&&entryHasContent(all[k]));}
 // Fixed daily structure (templates replaced): three good things (about the day before,
 // filled in the morning) in v.good[], one intention in v.intention, the evening reflection
 // in v.notes (same id old entries used), and whether the intention was kept in e.done.
@@ -588,6 +592,16 @@ function localSignIn(){
   localStorage.setItem('journal_sess',JSON.stringify({sub:'local',email:null,name:'You',exp:Date.now()+3650*24*60*60*1000}));
   enterApp('local',null,'You');
 }
+// A silent Google reconnect reloads the page. Before it does, rememberView() notes which tab you were on so
+// the app reopens there (it used to always reopen on Today, which looked like being thrown back to the home page).
+const RETURN_VIEWS=['today','entries','settings','scorecard','graphs','health','workouts','rewards'];
+function rememberView(){try{sessionStorage.setItem('journal_return_view',JSON.stringify({v:currentView,t:Date.now()}));}catch(e){}}
+function startView(){
+  let rv=null;
+  try{const r=JSON.parse(sessionStorage.getItem('journal_return_view')||'null');sessionStorage.removeItem('journal_return_view');if(r&&Date.now()-r.t<2*60*1000&&RETURN_VIEWS.includes(r.v))rv=r.v;}catch(e){}
+  if(healthReturn||new URLSearchParams(location.search).get('open')==='health')return 'health';
+  return rv||'today';
+}
 function enterApp(sub,email,name){
   currentUser=sub;currentUserEmail=email;currentUserName=name;
   document.getElementById('auth-screen').style.display='none';
@@ -596,7 +610,7 @@ function enterApp(sub,email,name){
   viewDate=dkey(new Date());
   document.getElementById('header-date').textContent=fmtLong(new Date());
   setupFileInputs();
-  showView(healthReturn||new URLSearchParams(location.search).get('open')==='health'?'health':'today');
+  showView(startView());
   if(navigator.serviceWorker)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='open'&&e.data.view)showView(e.data.view);});
   if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
   migrateInlinePhotos().then(changed=>{if(changed)refreshView(true);}).catch(()=>{});
@@ -604,7 +618,7 @@ function enterApp(sub,email,name){
   mirrorReminders(settingsData());
   setInterval(checkDueRemindersForeground,60000);
   setInterval(healthTick,5*60*1000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!userIsTyping())healthBoot(true);});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!busyNow())healthBoot(true);});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDueRemindersForeground();});
 }
 function signOut(){
@@ -1077,8 +1091,10 @@ function updateHeader(){
   }else sub.textContent=fmtLong(new Date());
 }
 function showView(v){
+  const prev=currentView;
   if(currentView==='today'&&v!=='today')flushDrafts();
   if(currentView==='workouts'&&v!=='workouts')wkStopAll();
+  if(v==='entries'&&currentView!=='entries')entriesShown=ENTRIES_PAGE;
   currentView=v;
   stopMic();
   const el=document.getElementById('view');
@@ -1092,8 +1108,12 @@ function showView(v){
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
   renderBottomNav();updateStarsFab();updateScorecardDue();updateHeader();
-  window.scrollTo(0,0);
-  if(v==='health')healthOnOpen();
+  // Health redraws itself on every range / day / calories tap and whenever a Fitbit refresh lands:
+  // stay where you are on the page there instead of jumping back to the top each time.
+  if(!(v==='health'&&prev==='health'))window.scrollTo(0,0);
+  // Check the Fitbit sign-in when you arrive on the tab, not on each of those redraws (an expired
+  // sign-in reloads the whole page to renew itself).
+  if(v==='health'&&prev!=='health')healthOnOpen();
 }
 
 // ── JOURNAL (time-aware home + full day editor; fixed daily structure) ──
@@ -1111,6 +1131,11 @@ function userIsTyping(){
   const a=document.activeElement;if(!a)return false;
   if(a.tagName==='TEXTAREA'||a.tagName==='SELECT')return true;
   return a.tagName==='INPUT'&&!/^(checkbox|radio|button|submit|range|color|file)$/.test(a.type);
+}
+// A silent reconnect reloads the page, so it must never start while you're in the middle of something:
+// typing, rating a scorecard, a workout timer running, or a pop-up open. It simply tries again next time.
+function busyNow(){
+  return userIsTyping()||!!scDraft||!!(wkPlayer&&wkPlayer.running)||!!document.getElementById('modal-root').innerHTML.trim();
 }
 function refreshView(clearDrafts){
   if(userIsTyping()){pendingRefresh=true;pendingRefreshClear=pendingRefreshClear||!!clearDrafts;return;}
@@ -1236,7 +1261,10 @@ function deleteDay(k){
     (existing.videos||[]).forEach(v=>idbDeleteVideo(v.id).catch(()=>{}));
     (existing.photos||[]).forEach(p=>{idbDeletePhoto(p.id).catch(()=>{});deleteRemotePhoto(p.id).catch(()=>{});});
   }
-  delete drafts[k];viewDate=dkey(new Date());showView('today');
+  delete drafts[k];
+  // Deleting from the Entries list: stay on the list (redrawn in place, so you keep your spot) instead of jumping to Today.
+  if(currentView==='entries'){renderEntries(document.getElementById('view'));return;}
+  viewDate=dkey(new Date());showView('today');
 }
 
 // ── PHOTOS ──
@@ -1449,30 +1477,49 @@ function entriesHeader(count){
   return `<div class="section-rule"><div><div class="section-title" style="font-family:'Cormorant Garamond',serif">Entries</div><div class="section-sub">${count} ${count===1?'day':'days'} written</div></div>
     <span class="sc-seg"><button class="${entriesTab==='list'?'on':''}" onclick="entriesTab='list';renderEntries(document.getElementById('view'))">List</button><button class="${entriesTab==='calendar'?'on':''}" onclick="entriesTab='calendar';renderEntries(document.getElementById('view'))">Calendar</button></span></div>`;
 }
-function renderEntries(el){
-  const keys=liveEntryKeys().sort().reverse();
-  if(entriesTab==='calendar'){el.innerHTML=entriesHeader(keys.length)+calendarInner();return;}
-  const all=getEntriesRaw();
-  const q=searchQ.trim().toLowerCase();
+// Only the newest ENTRIES_PAGE entries are drawn at a time (with a "Show more" button). Drawing every entry — each with its
+// inline photo/video thumbnails — made this screen slower the more you wrote: ~500 cards took about a third of a second on a
+// computer, so roughly a second per tap (and per search keystroke) on a phone.
+const ENTRIES_PAGE=30;let entriesShown=ENTRIES_PAGE;
+function entryList(){
+  const all=getEntriesRaw(),keys=liveEntryKeys(all).sort().reverse(),q=searchQ.trim().toLowerCase();
   const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
+  return {all,keys,q,shown};
+}
+function renderEntries(el){
+  const {all,keys,q,shown}=entryList();
+  if(entriesTab==='calendar'){el.innerHTML=entriesHeader(keys.length)+calendarInner();return;}
   // The search box stays in place while you type; only the results underneath are redrawn (redrawing the box closed the phone keyboard).
-  el.innerHTML=entriesHeader(keys.length)+`<div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;renderEntryResults()"/></div><div id="entries-results">${entryResultsHTML(shown,all,q)}</div>`;
+  el.innerHTML=entriesHeader(keys.length)+`<div class="search-wrap"><input placeholder="Search your journal…" value="${esc(searchQ)}" oninput="searchQ=this.value;entriesShown=ENTRIES_PAGE;renderEntryResults()"/></div><div id="entries-results">${entryResultsHTML(shown,all,q)}</div>`;
 }
 function renderEntryResults(){
   const box=document.getElementById('entries-results');if(!box)return;
-  const all=getEntriesRaw(),keys=liveEntryKeys().sort().reverse(),q=searchQ.trim().toLowerCase();
-  const shown=q?keys.filter(k=>JSON.stringify(all[k].v||{}).toLowerCase().includes(q)||fmtFull(parseKey(k)).toLowerCase().includes(q)):keys;
+  const {all,q,shown}=entryList();
   box.innerHTML=entryResultsHTML(shown,all,q);
 }
+function entriesMoreHTML(total){
+  const left=total-entriesShown;
+  return left>0?`<button class="btn" id="entries-more" style="width:100%;justify-content:center;margin:4px 0 14px" onclick="entriesShowMore()">Show ${Math.min(ENTRIES_PAGE,left)} more · ${left} older</button>`:'';
+}
+function entriesShowMore(){
+  const {all,shown}=entryList(),from=entriesShown;
+  entriesShown+=ENTRIES_PAGE;
+  const more=document.getElementById('entries-more'),box=document.getElementById('entries-results');
+  if(more)more.remove();
+  if(box)box.insertAdjacentHTML('beforeend',entryCardsHTML(shown.slice(from,entriesShown),all)+entriesMoreHTML(shown.length));
+}
 function entryResultsHTML(shown,all,q){
+  if(!shown.length)return `<div class="empty-note">${q?'Nothing found for that search.':'No entries yet.<br/>Today is a good day to start.'}</div>`;
+  return entryCardsHTML(shown.slice(0,entriesShown),all)+entriesMoreHTML(shown.length);
+}
+function entryCardsHTML(keys,all){
   let h='';
-  if(!shown.length){h+=`<div class="empty-note">${q?'Nothing found for that search.':'No entries yet.<br/>Today is a good day to start.'}</div>`;}
-  else h+=shown.map(k=>{
+  h+=keys.map(k=>{
     const e=all[k],d=parseKey(k),sn=entrySnippet(e),done=e.done;
     return `<div class="entry-card" onclick="openDay('${k}')">
       <div class="ec-head"><span class="ec-date" style="font-family:'Cormorant Garamond',serif">${esc(fmtFull(d))}</span><span style="display:flex;align-items:center;gap:8px">${done===true?'<span class="ec-done">✓ kept</span>':done===false?'<span class="ec-done miss">missed</span>':''}<button class="icon-btn" title="Delete entry" onclick="event.stopPropagation();deleteDay('${k}')"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
       ${sn?`<div class="ec-snippet">${esc(sn)}</div>`:''}
-      ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.thumb||p.img||''}" alt=""/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt=""/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
+      ${((e.photos||[]).length||(e.videos||[]).length)?`<div class="ec-photos">${(e.photos||[]).slice(0,5).map(p=>`<img src="${p.thumb||p.img||''}" alt="" loading="lazy" decoding="async"/>`).join('')}${(e.videos||[]).slice(0,5).map(v=>`<span class="ec-video-wrap"><img src="${v.thumb||''}" alt="" loading="lazy" decoding="async"/><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></span>`).join('')}</div>`:''}
     </div>`;}).join('');
   return h;
 }
@@ -2005,7 +2052,7 @@ function healthBoot(bg){
   const silent=(key,go)=>{
     if(sessionStorage.getItem(key+'_err'))return false;
     if(Date.now()-(+localStorage.getItem(key+'_tried_at')||0)<20*60*1000)return false;
-    localStorage.setItem(key+'_tried_at',String(Date.now()));if(bg)sessionStorage.setItem('journal_auth_bg','1');go(false);return true;
+    localStorage.setItem(key+'_tried_at',String(Date.now()));if(bg)sessionStorage.setItem('journal_auth_bg','1');rememberView();go(false);return true;
   };
   if(!getHealthToken())return silent('journal_health',healthAuthRedirect);
   if(coachDocOn()&&!getCoachDocToken()&&silent('journal_coachdoc',coachDocAuthRedirect))return true;
@@ -2699,8 +2746,8 @@ function starsAllowed(){return !!currentUserEmail&&STARS_BETA_EMAILS.map(x=>x.to
 // The FAB lives in the static shell (outside #view) so it survives every view's
 // innerHTML replacement — just toggle whether it's shown, from showView().
 function updateStarsFab(){
-  const btn=document.getElementById('stars-fab-btn');
-  if(btn)btn.style.display=(starsAllowed()&&!STAR_VIEWS.includes(currentView))?'flex':'none';
+  const show=(starsAllowed()&&!STAR_VIEWS.includes(currentView))?'flex':'none';
+  ['stars-fab-btn','health-fab-btn'].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display=show;});
 }
 function starsData(){return Object.assign({balance:0,log:[],earnActivities:[],spendRewards:[]},userData('stars',{}));}
 function starsEarnedOn(dateKey){const start=parseKey(dateKey).getTime(),end=start+86400000;return (starsData().log||[]).filter(l=>l.type==='earn'&&l.at>=start&&l.at<end).reduce((a,l)=>a+(l.stars||0),0);}
