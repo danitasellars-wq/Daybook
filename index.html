@@ -626,11 +626,21 @@ function localSignIn(){
 // the app reopens there (it used to always reopen on Today, which looked like being thrown back to the home page).
 const RETURN_VIEWS=['today','entries','settings','scorecard','graphs','health','workouts','rewards','sprint'];
 function rememberView(){try{sessionStorage.setItem('journal_return_view',JSON.stringify({v:currentView,t:Date.now()}));}catch(e){}}
+// Which tab you're on is noted in this browser session on every tab change, so a reload (pull-to-refresh, the browser's
+// refresh, or the phone reloading the page after it was in the background) reopens the same tab instead of Journal.
+function rememberLastView(){try{sessionStorage.setItem('journal_last_view',JSON.stringify({v:currentView,t:Date.now()}));}catch(e){}}
 function startView(){
   let rv=null;
   try{const r=JSON.parse(sessionStorage.getItem('journal_return_view')||'null');sessionStorage.removeItem('journal_return_view');if(r&&Date.now()-r.t<2*60*1000&&RETURN_VIEWS.includes(r.v))rv=r.v;}catch(e){}
   if(healthReturn||new URLSearchParams(location.search).get('open')==='health')return 'health';
-  return rv||'today';
+  if(rv)return rv;
+  // A reload stays on your tab however long ago you last changed it; opening the app again within half an hour does too.
+  // Opening it fresh later (e.g. the next morning) starts on Journal.
+  try{
+    const l=JSON.parse(sessionStorage.getItem('journal_last_view')||'null'),nav=performance.getEntriesByType('navigation')[0];
+    if(l&&RETURN_VIEWS.includes(l.v)&&((nav&&nav.type==='reload')||Date.now()-l.t<30*60*1000))return l.v;
+  }catch(e){}
+  return 'today';
 }
 function enterApp(sub,email,name){
   currentUser=sub;currentUserEmail=email;currentUserName=name;
@@ -654,6 +664,7 @@ function enterApp(sub,email,name){
 function signOut(){
   if(!confirm('Sign out? Your journal stays saved on this device and in your Google Drive.'))return;
   localStorage.removeItem('journal_sess');localStorage.removeItem('journal_drive_tok');
+  sessionStorage.removeItem('journal_last_view');
   location.reload();
 }
 window.addEventListener('load',()=>{
@@ -1140,6 +1151,7 @@ function showView(v){
   else if(v==='rewards')renderRewards(el);
   else renderSettings(el);
   renderBottomNav();updateStarsFab();updateScorecardDue();updateHeader();
+  rememberLastView();
   // Health redraws itself on every range / day / calories tap and whenever a Fitbit refresh lands:
   // stay where you are on the page there instead of jumping back to the top each time.
   if(!(v==='health'&&prev==='health'))window.scrollTo(0,0);
