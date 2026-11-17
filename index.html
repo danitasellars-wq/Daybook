@@ -339,11 +339,14 @@ input::placeholder,textarea::placeholder{font-style:normal}
 .def-legend{display:flex;gap:16px;font-size:.74rem;color:var(--muted);margin:-4px 0 8px}
 .def-legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px}
 .def-legend i.lg-target{border-top:2px dashed var(--muted)}
+.def-legend i.lg-burned{border-top:2px solid var(--ink)}
 .def-legend{flex-wrap:wrap;row-gap:4px}
 .lg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin:0 4px 1px 0;vertical-align:middle}
 .lg-dot.no{background:var(--bg);border:1.5px solid var(--accent);margin-left:6px}
 .def-sum{font-size:.82rem;margin:0 0 6px}
-.line-chart .ln-target{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.6}
+.line-chart .ln.ln-target{stroke:var(--muted);stroke-dasharray:5 4;stroke-width:1.6} /* .ln.ln-target: beats the later generic .ln rule so Target is grey like its legend */
+.line-chart .ln.ln-burned{stroke:var(--ink);stroke-width:1.8;opacity:.85}
+.line-chart .ln.ln-burned.part{stroke-dasharray:1.5 4}
 .line-chart .dot.today{fill:var(--ink);stroke:var(--bg);stroke-width:1.5}
 .lg-dot.td{background:var(--ink);margin-left:6px}
 .line-chart .dot.over{fill:var(--bg);stroke:var(--accent);stroke-width:1.5}
@@ -2148,7 +2151,8 @@ function openIntakeEditor(k){
     <div class="field-label" style="margin-top:12px">Calories eaten</div>
     <div class="vfield"><input id="ie-kcal" inputmode="numeric" autocomplete="off" placeholder="e.g. 2270" onkeydown="if(event.key==='Enter'){event.preventDefault();ieSave();}"/><span class="ie-unit">kcal</span></div>
     <div class="ie-hint" id="ie-hint"></div>
-    <div class="tb-actions"><button class="btn primary" onclick="ieSave()">Save</button><button class="btn" id="ie-clear" onclick="ieClear()">Clear this day</button><span style="flex:1"></span><button class="btn" onclick="closeModal()">Done</button></div>
+    <div class="hl-status" id="ie-clear" style="margin:8px 0 0"><a onclick="ieClear()">Clear this day</a></div>
+    <div class="tb-actions" style="justify-content:flex-end"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="ieSave()">Save</button></div>
     <div class="field-label" style="margin-top:18px">Last 14 days — tap a day to edit it</div>
     <div class="ie-list" id="ie-list"></div>`,'Calories eaten');
   ieLoad(k||dkey(new Date()));
@@ -2173,7 +2177,7 @@ function ieSave(){
   if(!(n>0)){alert('Enter the calories you ate, e.g. 2270.');return;}
   const d=intakeData();d[k]=n;setStore(userKey('intake'),d);
   const nm=ieDayName(k);showToast(`Saved ${n.toLocaleString('en-GB')} kcal for ${/^(Today|Yesterday)$/.test(nm)?nm.toLowerCase():nm}`,true);
-  intakeChanged();ieLoad(k);
+  closeModal();intakeChanged();
 }
 function ieClear(){
   const k=document.getElementById('ie-date').value,d=intakeData();
@@ -2188,12 +2192,15 @@ function deficitRows(){
 function deficitChartSVG(rows){
   if(!rows.length)return '<div class="empty-note" style="padding:28px 10px">No calories-burned data yet — it fills in as Fitbit syncs.</div>';
   const W=320,H=180,padL=34,padR=10,padT=12,padB=30,n=rows.length;
-  const tg=rows.map(r=>r.burned-DEFICIT_GOAL),all=tg.concat(rows.map(r=>r.eaten).filter(v=>v!=null));
+  const tg=rows.map(r=>r.burned-DEFICIT_GOAL),all=tg.concat(rows.map(r=>r.burned),rows.map(r=>r.eaten).filter(v=>v!=null));
   let min=Math.floor(Math.min(...all)*0.92/100)*100,max=Math.ceil(Math.max(...all)*1.04/100)*100;if(min===max)max+=100;
   const plotW=W-padL-padR,plotH=H-padT-padB;
   const x=i=>padL+(n===1?plotW/2:(i/(n-1))*plotW),y=v=>padT+plotH-((v-min)/(max-min))*plotH;
   let g='';for(let i=0;i<=2;i++){const gv=min+(max-min)*(i/2),gy=y(gv);g+=`<line class="grid" x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}"/><text class="yl" x="${padL-4}" y="${gy+3}" text-anchor="end">${Math.round(gv).toLocaleString('en-GB')}</text>`;}
   const target=`<polyline class="ln ln-target" points="${tg.map((v,i)=>`${x(i)},${y(v)}`).join(' ')}"/>`;
+  // Calories burned, so eaten sitting below this line = a deficit. Today's burn is still rising, so its last stretch is dotted.
+  const bp=i=>`${x(i)},${y(rows[i].burned)}`,lastToday=n>1&&rows[n-1].today,solid=rows.map((r,i)=>i).slice(0,lastToday?n-1:n);
+  const burned=(solid.length>1?`<polyline class="ln ln-burned" points="${solid.map(bp).join(' ')}"/>`:'')+(lastToday?`<polyline class="ln ln-burned part" points="${bp(n-2)} ${bp(n-1)}"/>`:'');
   let path='',pen=false;rows.forEach((r,i)=>{if(r.eaten==null){pen=false;return;}path+=`${pen?'L':'M'}${x(i)},${y(r.eaten)} `;pen=true;});
   const dots=rows.map((r,i)=>r.eaten==null?(r.today?`<circle class="dot today" cx="${x(i)}" cy="${y(tg[i])}" r="3.5"/>`:''):`<circle class="dot ${r.today?'today':r.burned-r.eaten>=DEFICIT_GOAL?'ok':'over'}" cx="${x(i)}" cy="${y(r.eaten)}" r="${r.today?3.5:3}"/>`).join('');
   const step=Math.ceil(n/6);
@@ -2209,7 +2216,7 @@ function deficitChartSVG(rows){
     const def=r.burned-r.eaten;
     return [Math.round(x(i)*10)/10,Math.round(y(r.eaten)*10)/10,`${date} · ate ${f(r.eaten)} · burned ${f(r.burned)}`,`${def>=0?'Deficit':'Surplus'} ${f(Math.abs(def))} kcal${def>=DEFICIT_GOAL?' ✓':''}`];
   });
-  return `<div class="lc-wrap" data-w="${W}" data-pts="${esc(JSON.stringify(pts))}"><svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${g}${target}<path class="ln ln-eaten" d="${path}"/>${dots}${xl}<circle class="dot-hi" r="5" cx="-20" cy="-20"/></svg><div class="lc-tip"></div></div>`;
+  return `<div class="lc-wrap" data-w="${W}" data-pts="${esc(JSON.stringify(pts))}"><svg viewBox="0 0 ${W} ${H}" class="line-chart" preserveAspectRatio="xMidYMid meet">${g}${burned}${target}<path class="ln ln-eaten" d="${path}"/>${dots}${xl}<circle class="dot-hi" r="5" cx="-20" cy="-20"/></svg><div class="lc-tip"></div></div>`;
 }
 function deficitCardHTML(){
   const rows=deficitRows(),logged=rows.filter(r=>r.eaten!=null&&!r.today),hd=healthData();
@@ -2224,7 +2231,7 @@ function deficitCardHTML(){
     <div class="hl-status"><a onclick="openIntakeEditor()">Add / edit calories eaten</a></div>
     <div class="hl-status">Evening reminder: ${(()=>{const r=foodReminder(),np='Notification' in window&&Notification.permission!=='granted';
       return r.enabled?`<a onclick="setFoodReminderTime()">${fmtClock(r.time)}</a> · <a onclick="toggleFoodReminder()">turn off</a>${np?' · <a onclick="allowFoodNotifs()">allow notifications</a>':''}`:`off · <a onclick="toggleFoodReminder()">turn on</a>`;})()}</div>
-    <div class="def-legend"><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed <b class="lg-dot td"></b>today</span></div>
+    <div class="def-legend"><span><i class="lg-burned"></i>Burned</span><span><i class="lg-target"></i>Target (burned − ${DEFICIT_GOAL})</span><span><i class="lg-eaten"></i>Eaten</span><span><b class="lg-dot"></b>goal met <b class="lg-dot no"></b>missed <b class="lg-dot td"></b>today</span></div>
     ${sum}${deficitChartSVG(rows)}</div>`;
 }
 function renderHealth(el){
